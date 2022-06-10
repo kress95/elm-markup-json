@@ -1,11 +1,18 @@
 {
-  "name": "react-elm",
-  "version": "0.0.1",
-  "main": "web/mod.ts",
-  "license": "UNLICENSED",
-  "private": true,
-  "devDependencies": {
-    "elm": "^0.19.1-5",
-    "prettier": "^2.6.2"
-  }
+    "name": "react-elm",
+    "version": "0.0.1",
+    "main": "web/mod.ts",
+    "license": "UNLICENSED",
+    "private": true,
+    "scripts": {
+        "fmt": "run-p fmt:elm fmt:ts",
+        "fmt:elm": "elm-format --yes src",
+        "fmt:ts": "prettier -w ."
+    },
+    "devDependencies": {
+        "elm": "^0.19.1-5",
+        "elm-format": "^0.8.5",
+        "npm-run-all": "^4.1.5",
+        "prettier": "^2.6.2"
+    }
 }

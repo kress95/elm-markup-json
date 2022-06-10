@@ -1,10 +1,15 @@
 root = true
 
-[*]
-indent_style = space
-indent_size = 2
+[*.{json,ts,mjs,elm}]
 charset = utf-8
+indent_style = space
 trim_trailing_whitespace = true
 insert_final_newline = true
 end_of_line = lf
 max_line_length = 100
+
+[*.{ts,mjs}]
+indent_size = 2
+
+[*.{json,elm}]
+indent_size = 4
