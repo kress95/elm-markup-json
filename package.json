@@ -1,0 +1,11 @@
+{
+  "name": "react-elm",
+  "version": "0.0.1",
+  "main": "web/mod.ts",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "elm": "^0.19.1-5",
+    "prettier": "^2.6.2"
+  }
+}

@@ -1,0 +1,7 @@
+**/.cache
+**/.vscode
+**/dist/
+**/elm-stuff/
+**/elm.json
+**/node_modules/
+**/package-lock.json
