@@ -2,7 +2,7 @@ module React.Internals.Json.HashedEncode exposing
     ( encode, hash
     , string, int, float, bool, null
     , list, array, set
-    , object, dict
+    , object, objectWithHash, dict
     , HashedValue, isEqual
     )
 
@@ -26,7 +26,7 @@ module React.Internals.Json.HashedEncode exposing
 
 # Objects
 
-@docs object, dict
+@docs object, objectWithHash, dict
 
 -}
 
@@ -116,6 +116,15 @@ object pairs =
         (Encode.object (List.map unwrapValue pairs))
 
 
+objectWithHash : String -> List ( String, HashedValue ) -> HashedValue
+objectWithHash key pairs =
+    let
+        seed =
+            List.foldl hashPair seedForObject pairs
+    in
+    Value seed (Encode.object (List.map unwrapValue (( key, int seed ) :: pairs)))
+
+
 dict : (k -> String) -> (v -> HashedValue) -> Dict k v -> HashedValue
 dict toKey toValue dictionary =
     let
@@ -196,7 +205,7 @@ dictHelp toKey toValue =
                 key =
                     toKey k
 
-                (Value seed_ _ as value) =
+                ((Value seed_ _) as value) =
                     toValue v
             in
             ( Hash.stringWith key (Hash.combine seed_ seed)
