@@ -1,33 +1,28 @@
 module React.Internals.VirtualDom exposing
     ( VirtualDom, text, node, nodeWithKey, encode
-    , Prop, prop
-    , Key, key
+    , Prop, prop, createProp
     )
 
 {-|
 
 @docs VirtualDom, text, node, nodeWithKey, encode
-@docs Prop, prop
-@docs Key, key
+@docs Prop, prop, createProp
 
 -}
 
 import Dict exposing (Dict)
-import Json.Encode exposing (Value)
+import Html exposing (a)
+import Json.Encode as Encode exposing (Value)
 import React.Internals.Hash as Hash exposing (Hash)
 import React.Internals.Json.HashedEncode as HashedEncode exposing (HashedValue)
 
 
+
+-- VirtualDom
+
+
 type VirtualDom
     = VirtualDom HashedValue
-
-
-type Prop
-    = Prop ( Hash, String )
-
-
-type Key
-    = Key HashedValue
 
 
 text : String -> VirtualDom
@@ -35,83 +30,81 @@ text =
     HashedEncode.string >> VirtualDom
 
 
-prop : String -> Prop
-prop name =
-    Prop ( Hash.stringWith name propSeed, name )
-
-
-key : String -> Key
-key =
-    HashedEncode.string >> Key
-
-
-node : List ( Prop, HashedValue ) -> List VirtualDom -> VirtualDom
+node : List Prop -> List VirtualDom -> VirtualDom
 node props children =
-    HashedEncode.objectWithHash "#"
-        [ ( "&", HashedEncode.unsafeObjectWithHash unwrapProp "#" props )
-        , ( "*", HashedEncode.list encodeChild (List.indexedMap getCachedKey children) )
-        ]
-        |> VirtualDom
+    nodeWithKey props (List.indexedMap withKey children)
 
 
-nodeWithKey : List ( Prop, HashedValue ) -> List ( Key, VirtualDom ) -> VirtualDom
+nodeWithKey : List Prop -> List ( HashedValue, VirtualDom ) -> VirtualDom
 nodeWithKey props children =
-    HashedEncode.objectWithHash "#"
-        [ ( "&", HashedEncode.unsafeObjectWithHash unwrapProp "#" props )
-        , ( "*", HashedEncode.list encodeChild children )
+    HashedEncode.objectWithHash "h"
+        [ ( "p", encodeProps props )
+        , ( "c", HashedEncode.list encodeChild children )
         ]
         |> VirtualDom
 
 
 encode : VirtualDom -> Value
 encode (VirtualDom value) =
-    HashedEncode.encode value
+    HashedEncode.value value
+
+
+
+-- Prop
+
+
+type Prop
+    = Prop Hash ( String, Value )
+
+
+prop : String -> HashedValue -> Prop
+prop key value =
+    Prop (Hash.join (Hash.stringWith key propSeed) (HashedEncode.hash value))
+        ( key, HashedEncode.value value )
+
+
+createProp : String -> (a -> HashedValue) -> (a -> Prop)
+createProp key encoder =
+    let
+        keyHash =
+            Hash.stringWith key propSeed
+    in
+    \a ->
+        let
+            value =
+                encoder a
+        in
+        Prop (Hash.join keyHash (HashedEncode.hash value))
+            ( key, HashedEncode.value value )
 
 
 
 -- internals
 
 
-propSeed : Hash
-propSeed =
-    Hash.string "prop"
-
-
-unwrapProp : Prop -> ( Int, String )
-unwrapProp (Prop pair) =
-    pair
-
-
-encodeChild : ( Key, VirtualDom ) -> HashedValue
-encodeChild ( Key a, VirtualDom b ) =
-    HashedEncode.objectWithHash "#"
-        [ ( "@", a )
-        , ( "$", b )
-        ]
-
-
-getCachedKey : Int -> VirtualDom -> ( Key, VirtualDom )
-getCachedKey index value =
+withKey : Int -> VirtualDom -> ( HashedValue, VirtualDom )
+withKey index value =
     if index > 0 && index < 10000 then
-        case Dict.get index cachedKeys of
+        case Dict.get index cache of
             Just k ->
                 ( k, value )
 
             Nothing ->
-                ( Key (HashedEncode.int index)
+                -- this should never happen
+                ( HashedEncode.int index
                 , value
                 )
 
     else
-        ( Key (HashedEncode.int index)
+        ( HashedEncode.int index
         , value
         )
 
 
-cachedKeys : Dict Int Key
-cachedKeys =
+cache : Dict Int HashedValue
+cache =
     list 1000
-        |> List.map (\i -> ( i, Key (HashedEncode.int i) ))
+        |> List.map (\i -> ( i, HashedEncode.int i ))
         |> Dict.fromList
 
 
@@ -127,3 +120,41 @@ listHelp length xs =
 
     else
         xs
+
+
+encodeProps : List Prop -> HashedValue
+encodeProps props =
+    let
+        seed =
+            List.foldl reduceHashProps propsSeed props
+    in
+    Encode.object (( "h", Encode.int seed ) :: List.map unwrapProp props)
+        |> HashedEncode.unsafe seed
+
+
+reduceHashProps : Prop -> Int -> Int
+reduceHashProps (Prop hash _) seed =
+    Hash.combine hash seed
+
+
+propsSeed : Int
+propsSeed =
+    Hash.string "props"
+
+
+unwrapProp : Prop -> ( String, Value )
+unwrapProp (Prop _ kv) =
+    kv
+
+
+encodeChild : ( HashedValue, VirtualDom ) -> HashedValue
+encodeChild ( key, VirtualDom b ) =
+    HashedEncode.objectWithHash "h"
+        [ ( "k", key )
+        , ( "v", b )
+        ]
+
+
+propSeed : Int
+propSeed =
+    Hash.string "prop"
