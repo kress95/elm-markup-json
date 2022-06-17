@@ -1,17 +1,21 @@
 module React.Internals.VirtualDom exposing
     ( VirtualDom, text, node, nodeWithKey, encode
-    , Prop, prop, createProp
+    , Prop, prop, customProp
     )
 
 {-|
 
+
+# VirtualDom
+
 @docs VirtualDom, text, node, nodeWithKey, encode
-@docs Prop, prop, createProp
+
+
+# Prop
+
+@docs Prop, prop, customProp
 
 -}
-
-import Dict exposing (Dict)
-import Html exposing (a)
 import Json.Encode as Encode exposing (Value)
 import React.Internals.Hash as Hash exposing (Hash)
 import React.Json.HashedEncode as HashedEncode exposing (HashedValue)
@@ -63,8 +67,8 @@ prop key value =
         ( key, HashedEncode.value value )
 
 
-createProp : String -> (a -> HashedValue) -> (a -> Prop)
-createProp key encoder =
+customProp : String -> (a -> HashedValue) -> (a -> Prop)
+customProp key encoder =
     let
         keyHash =
             Hash.stringWith key propSeed
@@ -84,42 +88,7 @@ createProp key encoder =
 
 withKey : Int -> VirtualDom -> ( HashedValue, VirtualDom )
 withKey index value =
-    if index > 0 && index < 10000 then
-        case Dict.get index cache of
-            Just k ->
-                ( k, value )
-
-            Nothing ->
-                -- this should never happen
-                ( HashedEncode.int index
-                , value
-                )
-
-    else
-        ( HashedEncode.int index
-        , value
-        )
-
-
-cache : Dict Int HashedValue
-cache =
-    list 1000
-        |> List.map (\i -> ( i, HashedEncode.int i ))
-        |> Dict.fromList
-
-
-list : Int -> List Int
-list length =
-    listHelp (length - 1) []
-
-
-listHelp : Int -> List Int -> List Int
-listHelp length xs =
-    if length > -1 then
-        listHelp (length - 1) (length :: xs)
-
-    else
-        xs
+    ( HashedEncode.int index, value )
 
 
 encodeProps : List Prop -> HashedValue
