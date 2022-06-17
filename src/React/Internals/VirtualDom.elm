@@ -14,7 +14,7 @@ import Dict exposing (Dict)
 import Html exposing (a)
 import Json.Encode as Encode exposing (Value)
 import React.Internals.Hash as Hash exposing (Hash)
-import React.Internals.Json.HashedEncode as HashedEncode exposing (HashedValue)
+import React.Json.HashedEncode as HashedEncode exposing (HashedValue)
 
 
 
