@@ -62,17 +62,17 @@ isEqual (HashedValue a _) (HashedValue b _) =
 
 string : String -> HashedValue
 string a =
-    HashedValue (Hash.stringWith a seedForString) (Encode.string a)
+    HashedValue (Hash.stringWith a stringSeed) (Encode.string a)
 
 
 int : Int -> HashedValue
 int a =
-    HashedValue (Hash.intWith a seedForInt) (Encode.int a)
+    HashedValue (Hash.intWith a intSeed) (Encode.int a)
 
 
 float : Float -> HashedValue
 float a =
-    HashedValue (Hash.floatWith a seedForFloat) (Encode.float a)
+    HashedValue (Hash.floatWith a floatSeed) (Encode.float a)
 
 
 bool : Bool -> HashedValue
@@ -101,7 +101,7 @@ null =
 
 list : (value -> HashedValue) -> List value -> HashedValue
 list func entries =
-    listHelp seedForArray func entries
+    listHelp arraySeed func entries
 
 
 array : (value -> HashedValue) -> Array value -> HashedValue
@@ -110,18 +110,18 @@ array func entries =
         values =
             Array.map func entries
     in
-    HashedValue (Array.foldl hashValue seedForArray values)
+    HashedValue (Array.foldl hashValue arraySeed values)
         (Encode.array value values)
 
 
 set : (value -> HashedValue) -> Set value -> HashedValue
 set func entries =
-    listHelp seedForArray func (Set.toList entries)
+    listHelp arraySeed func (Set.toList entries)
 
 
 object : List ( String, HashedValue ) -> HashedValue
 object pairs =
-    HashedValue (List.foldl hashPair seedForObject pairs)
+    HashedValue (List.foldl hashPair objectSeed pairs)
         (Encode.object (List.map unwrapValue pairs))
 
 
@@ -129,7 +129,7 @@ objectWithHash : String -> List ( String, HashedValue ) -> HashedValue
 objectWithHash key pairs =
     let
         seed =
-            List.foldl hashPair seedForObject pairs
+            List.foldl hashPair objectSeed pairs
     in
     Encode.object (( key, Encode.int seed ) :: List.map unwrapValue pairs)
         |> HashedValue seed
@@ -148,28 +148,28 @@ dict toKey toValue dictionary =
 -- internal
 
 
-seedForString : Int
-seedForString =
+stringSeed : Int
+stringSeed =
     Hash.string "string"
 
 
-seedForInt : Int
-seedForInt =
+intSeed : Int
+intSeed =
     Hash.string "int"
 
 
-seedForFloat : Int
-seedForFloat =
+floatSeed : Int
+floatSeed =
     Hash.string "float"
 
 
-seedForArray : Int
-seedForArray =
+arraySeed : Int
+arraySeed =
     Hash.string "array"
 
 
-seedForObject : Int
-seedForObject =
+objectSeed : Int
+objectSeed =
     Hash.string "object"
 
 
@@ -182,7 +182,7 @@ hashPair : ( String, HashedValue ) -> Int -> Int
 hashPair ( key, HashedValue valueHash _ ) seed =
     let
         keyHash =
-            Hash.stringWith key seedForString
+            Hash.stringWith key stringSeed
     in
     Hash.combine (Hash.join keyHash valueHash) seed
 
@@ -216,4 +216,4 @@ dictHelp toKey toValue =
             , Dict.insert key a dictionary
             )
         )
-        ( seedForObject, Dict.empty )
+        ( objectSeed, Dict.empty )
