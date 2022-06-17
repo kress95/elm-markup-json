@@ -1,9 +1,8 @@
 module React.Internals.Json.HashedEncode exposing
-    ( HashedValue, encode, hash, isEqual
+    ( HashedValue, unsafe, value, hash, isEqual
     , string, int, float, bool, null
     , list, array, set
     , object, objectWithHash, dict
-    , unsafeObject, unsafeObjectWithHash
     )
 
 {-| Library for turning Elm values into Json values.
@@ -11,7 +10,7 @@ module React.Internals.Json.HashedEncode exposing
 
 # Encoding
 
-@docs HashedValue, encode, hash, value, isEqual
+@docs HashedValue, unsafe, value, hash, isEqual
 
 
 # Primitives
@@ -27,7 +26,6 @@ module React.Internals.Json.HashedEncode exposing
 # Objects
 
 @docs object, objectWithHash, dict
-@docs unsafeObject, unsafeObjectWithHash
 
 -}
 
@@ -42,14 +40,24 @@ type HashedValue
     = HashedValue Hash Value
 
 
+unsafe : Hash -> Value -> HashedValue
+unsafe =
+    HashedValue
+
+
 hash : HashedValue -> Int
 hash (HashedValue seed _) =
     seed
 
 
-encode : HashedValue -> Value
-encode (HashedValue _ a) =
+value : HashedValue -> Value
+value (HashedValue _ a) =
     a
+
+
+isEqual : HashedValue -> HashedValue -> Bool
+isEqual (HashedValue a _) (HashedValue b _) =
+    a == b
 
 
 string : String -> HashedValue
@@ -103,7 +111,7 @@ array func entries =
             Array.map func entries
     in
     HashedValue (Array.foldl hashValue seedForArray values)
-        (Encode.array encode values)
+        (Encode.array value values)
 
 
 set : (value -> HashedValue) -> Set value -> HashedValue
@@ -127,53 +135,17 @@ objectWithHash key pairs =
         |> HashedValue seed
 
 
-unsafeObject : (key -> ( Int, String )) -> List ( key, HashedValue ) -> HashedValue
-unsafeObject getKey pairs =
-    Encode.object (mapHelpUnsafeObject getKey unwrapUnsafeValue pairs)
-        |> HashedValue (foldlHelpUnsafeObject getKey hashUnsafePair seedForObject pairs)
-
-
-unsafeObjectWithHash : (key -> ( Int, String )) -> String -> List ( key, HashedValue ) -> HashedValue
-unsafeObjectWithHash getKey key pairs =
-    let
-        seed =
-            foldlHelpUnsafeObject getKey hashUnsafePair seedForObject pairs
-    in
-    Encode.object (( key, Encode.int seed ) :: mapHelpUnsafeObject getKey unwrapUnsafeValue pairs)
-        |> HashedValue seed
-
-
 dict : (k -> String) -> (v -> HashedValue) -> Dict k v -> HashedValue
 dict toKey toValue dictionary =
     let
         ( seed, values ) =
             dictHelp toKey toValue dictionary
     in
-    HashedValue seed (Encode.dict identity encode values)
-
-
-isEqual : HashedValue -> HashedValue -> Bool
-isEqual (HashedValue a _) (HashedValue b _) =
-    a == b
+    HashedValue seed (Encode.dict identity value values)
 
 
 
 -- internal
-
-
-foldlHelpUnsafeObject : (a -> key) -> (( key, b ) -> value -> value) -> value -> List ( a, b ) -> value
-foldlHelpUnsafeObject getKey func acc xs =
-    case xs of
-        [] ->
-            acc
-
-        ( key, value ) :: xs_ ->
-            foldlHelpUnsafeObject getKey func (func ( getKey key, value ) acc) xs_
-
-
-mapHelpUnsafeObject : (key -> b) -> (( b, a ) -> value) -> List ( key, a ) -> List value
-mapHelpUnsafeObject getKey f xs =
-    List.foldr (\( k, v ) acc -> f ( getKey k, v ) :: acc) [] xs
 
 
 seedForString : Int
@@ -220,19 +192,9 @@ hashPair ( key, HashedValue valueHash _ ) seed =
     Hash.combine (Hash.join keyHash valueHash) seed
 
 
-hashUnsafePair : ( ( Int, a ), HashedValue ) -> Int -> Int
-hashUnsafePair ( ( keyHash, _ ), HashedValue valueHash _ ) seed =
-    Hash.combine (Hash.join keyHash valueHash) seed
-
-
 unwrapValue : ( String, HashedValue ) -> ( String, Value )
 unwrapValue ( key, a ) =
-    ( key, encode a )
-
-
-unwrapUnsafeValue : ( ( a, String ), HashedValue ) -> ( String, Value )
-unwrapUnsafeValue ( ( _, key ), a ) =
-    ( key, encode a )
+    ( key, value a )
 
 
 listHelp : Int -> (value -> HashedValue) -> List value -> HashedValue
@@ -241,7 +203,7 @@ listHelp seed func entries =
         values =
             List.map func entries
     in
-    HashedValue (List.foldl hashValue seed values) (Encode.list encode values)
+    HashedValue (List.foldl hashValue seed values) (Encode.list value values)
 
 
 dictHelp : (k -> String) -> (v -> HashedValue) -> Dict k v -> ( Int, Dict String HashedValue )
