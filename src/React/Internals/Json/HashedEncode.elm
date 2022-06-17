@@ -173,11 +173,6 @@ seedForObject =
     Hash.string "object"
 
 
-seedForDict : Int
-seedForDict =
-    Hash.string "dict"
-
-
 hashValue : HashedValue -> Int -> Int
 hashValue (HashedValue seed _) =
     Hash.join seed
@@ -221,4 +216,4 @@ dictHelp toKey toValue =
             , Dict.insert key a dictionary
             )
         )
-        ( seedForDict, Dict.empty )
+        ( seedForObject, Dict.empty )
