@@ -75,7 +75,7 @@ prop key hashedValue =
     in
     { hashForKey = Hash.stringWith key propSeed
     , hashForValue = Hash.join  hashForValue
-    , entry = ( key, Encode.object [value] )
+    , entry = ( key, Encode.object value )
     }
         |> Prop
 
