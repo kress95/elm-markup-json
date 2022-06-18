@@ -19,7 +19,7 @@ module React.VirtualDom exposing
 
 import Json.Encode as Encode exposing (Value)
 import React.Hash as Hash exposing (Hash)
-import Json.HashedEncode as HashedEncode exposing (HashedValue)
+import Json.HashEncode as HashEncode exposing (HashedValue)
 
 
 
@@ -32,7 +32,7 @@ type VirtualDom
 
 text : String -> VirtualDom
 text =
-    HashedEncode.string >> VirtualDom
+    HashEncode.string >> VirtualDom
 
 
 node : List Prop -> List VirtualDom -> VirtualDom
@@ -42,21 +42,21 @@ node props children =
 
 nodeWithKey : List Prop -> List ( HashedValue, VirtualDom ) -> VirtualDom
 nodeWithKey props children =
-    HashedEncode.objectWithHash "h"
+    HashEncode.objectWithHash "h"
         [ ( "p", encodeProps props )
-        , ( "c", HashedEncode.list encodeChild children )
+        , ( "c", HashEncode.list encodeChild children )
         ]
         |> VirtualDom
 
 
 isEqual : VirtualDom -> VirtualDom -> Bool
 isEqual (VirtualDom a) (VirtualDom b) =
-    HashedEncode.isEqual a b
+    HashEncode.isEqual a b
 
 
 encode : VirtualDom -> Value
 encode (VirtualDom value) =
-    HashedEncode.value value
+    HashEncode.value value
 
 
 
@@ -69,8 +69,8 @@ type Prop
 
 prop : String -> HashedValue -> Prop
 prop key value =
-    Prop (Hash.join (Hash.stringWith key propSeed) (HashedEncode.hash value))
-        ( key, HashedEncode.value value )
+    Prop (Hash.join (Hash.stringWith key propSeed) (HashEncode.hash value))
+        ( key, HashEncode.value value )
 
 
 customProp : String -> (a -> HashedValue) -> (a -> Prop)
@@ -84,8 +84,8 @@ customProp key encoder =
             value =
                 encoder a
         in
-        Prop (Hash.join keyHash (HashedEncode.hash value))
-            ( key, HashedEncode.value value )
+        Prop (Hash.join keyHash (HashEncode.hash value))
+            ( key, HashEncode.value value )
 
 
 
@@ -94,7 +94,7 @@ customProp key encoder =
 
 withKey : Int -> VirtualDom -> ( HashedValue, VirtualDom )
 withKey index value =
-    ( HashedEncode.int index, value )
+    ( HashEncode.int index, value )
 
 
 encodeProps : List Prop -> HashedValue
@@ -104,7 +104,7 @@ encodeProps props =
             List.foldl reduceHashProps propsSeed props
     in
     Encode.object (( "h", Encode.int seed ) :: List.map unwrapProp props)
-        |> HashedEncode.unsafe seed
+        |> HashEncode.unsafe seed
 
 
 reduceHashProps : Prop -> Int -> Int
@@ -124,7 +124,7 @@ unwrapProp (Prop _ kv) =
 
 encodeChild : ( HashedValue, VirtualDom ) -> HashedValue
 encodeChild ( key, VirtualDom b ) =
-    HashedEncode.objectWithHash "h"
+    HashEncode.objectWithHash "h"
         [ ( "k", key )
         , ( "v", b )
         ]

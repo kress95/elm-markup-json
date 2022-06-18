@@ -1,4 +1,4 @@
-module Json.HashedEncode exposing
+module Json.HashEncode exposing
     ( HashedValue, unsafe, value, hash, isEqual
     , string, int, float, bool, null
     , list, array, set

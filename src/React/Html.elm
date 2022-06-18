@@ -20,7 +20,7 @@ module React.Html exposing
 import Dict exposing (Dict)
 import Json.Encode exposing (Value)
 import React.VirtualDom as VirtualDom exposing (VirtualDom)
-import Json.HashedEncode as HashedEncode exposing (HashedValue)
+import Json.HashEncode as HashEncode exposing (HashedValue)
 
 
 
@@ -93,7 +93,7 @@ customAttr =
 
 toAttr : String -> Attr
 toAttr =
-    customAttr "tag" HashedEncode.string
+    customAttr "tag" HashEncode.string
 
 
 withKey : Int -> Html -> ( HashedValue, Html )
@@ -105,12 +105,12 @@ withKey index value =
 
             Nothing ->
                 -- this should never happen
-                ( HashedEncode.int index
+                ( HashEncode.int index
                 , value
                 )
 
     else
-        ( HashedEncode.int index
+        ( HashEncode.int index
         , value
         )
 
@@ -118,7 +118,7 @@ withKey index value =
 cache : Dict Int HashedValue
 cache =
     list 1000
-        |> List.map (\i -> ( i, HashedEncode.int i ))
+        |> List.map (\i -> ( i, HashEncode.int i ))
         |> Dict.fromList
 
 
