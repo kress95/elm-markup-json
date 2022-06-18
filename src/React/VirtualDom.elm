@@ -17,8 +17,8 @@ module React.VirtualDom exposing
 
 -}
 
-import Json.Encode as Encode exposing (Value)
 import Hash as Hash exposing (Hash)
+import Json.Encode as Encode exposing (Value)
 import Json.HashEncode as HashEncode exposing (HashedValue)
 
 
@@ -37,14 +37,14 @@ text =
 
 node : List Prop -> List VirtualDom -> VirtualDom
 node props children =
-    nodeWithKey props (List.indexedMap withKey children)
+    nodeWithKey props (List.indexedMap withIndex children)
 
 
 nodeWithKey : List Prop -> List ( HashedValue, VirtualDom ) -> VirtualDom
 nodeWithKey props children =
-    HashEncode.objectWithHash "h"
-        [ ( "p", encodeProps props )
-        , ( "c", HashEncode.list encodeChild children )
+    encodeEntryHashedKey
+        [ propsEntry (encodeProps props)
+        , childrenEntry (HashEncode.list encodeChild children)
         ]
         |> VirtualDom
 
@@ -60,56 +60,53 @@ encode (VirtualDom value) =
 
 
 
--- Prop
+-- -- Prop
 
 
 type Prop
-    = Prop Hash ( String, Value )
+    = Prop EntryHashedKey
 
 
 prop : String -> HashedValue -> Prop
 prop key value =
-    Prop (Hash.join (Hash.stringWith key propSeed) (HashEncode.hash value))
-        ( key, HashEncode.value value )
+    Prop
+        ( Hash.stringWith key propSeed
+        , HashEncode.hash value
+        , ( key, HashEncode.value value )
+        )
 
 
 customProp : String -> (a -> HashedValue) -> (a -> Prop)
 customProp key encoder =
     let
-        keyHash =
-            Hash.stringWith key propSeed
+        toEntry =
+            entryHashedKey key
     in
-    \a ->
-        let
-            value =
-                encoder a
-        in
-        Prop (Hash.join keyHash (HashEncode.hash value))
-            ( key, HashEncode.value value )
+    \value -> Prop (toEntry (encoder value))
 
 
 
 -- internals
 
 
-withKey : Int -> VirtualDom -> ( HashedValue, VirtualDom )
-withKey index value =
+withIndex : Int -> VirtualDom -> ( HashedValue, VirtualDom )
+withIndex index value =
     ( HashEncode.int index, value )
 
 
 encodeProps : List Prop -> HashedValue
-encodeProps props =
+encodeProps pairs =
     let
         seed =
-            List.foldl reduceHashProps propsSeed props
+            List.foldl foldHashingProps propsSeed pairs
     in
-    Encode.object (( "h", Encode.int seed ) :: List.map unwrapProp props)
+    Encode.object (( "h", Encode.int seed ) :: List.map unwrapProp pairs)
         |> HashEncode.unsafe seed
 
 
-reduceHashProps : Prop -> Int -> Int
-reduceHashProps (Prop hash _) seed =
-    Hash.combine hash seed
+foldHashingProps : Prop -> Int -> Int
+foldHashingProps (Prop ( keyHash, valueHash, _ )) seed =
+    Hash.combine (Hash.join keyHash valueHash) seed
 
 
 propsSeed : Int
@@ -118,18 +115,80 @@ propsSeed =
 
 
 unwrapProp : Prop -> ( String, Value )
-unwrapProp (Prop _ kv) =
+unwrapProp (Prop ( _, _, kv )) =
     kv
 
 
 encodeChild : ( HashedValue, VirtualDom ) -> HashedValue
 encodeChild ( key, VirtualDom b ) =
-    HashEncode.objectWithHash "h"
-        [ ( "k", key )
-        , ( "v", b )
+    encodeEntryHashedKey
+        [ keyEntry key
+        , valueEntry b
         ]
 
 
 propSeed : Int
 propSeed =
     Hash.string "prop"
+
+
+
+-- super internal speed hacks
+
+
+type alias EntryHashedKey =
+    ( Hash, Hash, ( String, Value ) )
+
+
+encodeEntryHashedKey : List EntryHashedKey -> HashedValue
+encodeEntryHashedKey pairs =
+    let
+        seed =
+            List.foldl foldHashingEntries objectSeed pairs
+    in
+    Encode.object (( "h", Encode.int seed ) :: List.map unwrapEntryHashedKey pairs)
+        |> HashEncode.unsafe seed
+
+
+foldHashingEntries : EntryHashedKey -> Int -> Int
+foldHashingEntries ( keyHash, valueHash, ( _, value ) ) seed =
+    Hash.combine (Hash.join keyHash valueHash) seed
+
+
+objectSeed : Int
+objectSeed =
+    Hash.string "object"
+
+
+unwrapEntryHashedKey : EntryHashedKey -> ( String, Value )
+unwrapEntryHashedKey ( _, _, ( key, value ) ) =
+    ( key, value )
+
+
+keyEntry : HashedValue -> EntryHashedKey
+keyEntry =
+    entryHashedKey "k"
+
+
+valueEntry : HashedValue -> EntryHashedKey
+valueEntry =
+    entryHashedKey "v"
+
+
+propsEntry : HashedValue -> EntryHashedKey
+propsEntry =
+    entryHashedKey "p"
+
+
+childrenEntry : HashedValue -> EntryHashedKey
+childrenEntry =
+    entryHashedKey "c"
+
+
+entryHashedKey : String -> HashedValue -> EntryHashedKey
+entryHashedKey str =
+    let
+        hashedKey =
+            HashEncode.hash (HashEncode.string str)
+    in
+    \value -> ( hashedKey, HashEncode.hash value, ( str, HashEncode.value value ) )
