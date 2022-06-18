@@ -121,7 +121,7 @@ unwrapProp (Prop ( _, _, kv )) =
 
 encodeChild : ( HashedValue, VirtualDom ) -> HashedValue
 encodeChild ( key, VirtualDom b ) =
-    encodeEntryHashedKey
+    encodeEntry
         [ keyEntry key
         , valueEntry b
         ]
@@ -138,6 +138,12 @@ propSeed =
 
 type alias EntryHashedKey =
     ( Hash, Hash, ( String, Value ) )
+
+
+encodeEntry : List EntryHashedKey -> HashedValue
+encodeEntry pairs =
+    HashEncode.unsafe (List.foldl foldHashingEntries objectSeed pairs)
+        (Encode.object (List.map unwrapEntryHashedKey pairs))
 
 
 encodeEntryHashedKey : List EntryHashedKey -> HashedValue
