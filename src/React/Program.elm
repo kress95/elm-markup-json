@@ -2,8 +2,8 @@ module React.Program exposing (Program, ProgramCmd, ProgramMsg, ProgramSub, work
 
 import Json.Decode as Decode exposing (Decoder, Value)
 import Platform
-import React.Changeset as Diff
 import React.Html as Html exposing (Html)
+import React.Internals.VirtualDom as VirtualDom
 
 
 type ProgramModel model
@@ -86,17 +86,21 @@ updateFrom { update, view, send } msg (Model html model) =
                     update updateMsg model
 
                 EventError _ ->
-                    -- TODO: send error back
+                    -- TODO: create error page
                     ( model, Cmd.none )
 
         html_ =
             view model_
     in
     ( Model html_ model_
-    , Cmd.batch
-        [ Cmd.map Msg cmd
-        , send (Diff.encode (Diff.cast html html_))
-        ]
+    , if VirtualDom.isEqual html html_ then
+        Cmd.map Msg cmd
+
+      else
+        Cmd.batch
+            [ Cmd.map Msg cmd
+            , send (VirtualDom.encode html_)
+            ]
     )
 
 

@@ -1,5 +1,5 @@
 module React.Internals.VirtualDom exposing
-    ( VirtualDom, text, node, nodeWithKey, encode
+    ( VirtualDom, text, node, nodeWithKey, isEqual, encode
     , Prop, prop, customProp
     )
 
@@ -8,7 +8,7 @@ module React.Internals.VirtualDom exposing
 
 # VirtualDom
 
-@docs VirtualDom, text, node, nodeWithKey, encode
+@docs VirtualDom, text, node, nodeWithKey, isEqual, encode
 
 
 # Prop
@@ -16,6 +16,7 @@ module React.Internals.VirtualDom exposing
 @docs Prop, prop, customProp
 
 -}
+
 import Json.Encode as Encode exposing (Value)
 import React.Internals.Hash as Hash exposing (Hash)
 import React.Json.HashedEncode as HashedEncode exposing (HashedValue)
@@ -46,6 +47,11 @@ nodeWithKey props children =
         , ( "c", HashedEncode.list encodeChild children )
         ]
         |> VirtualDom
+
+
+isEqual : VirtualDom -> VirtualDom -> Bool
+isEqual (VirtualDom a) (VirtualDom b) =
+    HashedEncode.isEqual a b
 
 
 encode : VirtualDom -> Value
