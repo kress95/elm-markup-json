@@ -1,4 +1,4 @@
-module React.Internals.VirtualDom exposing
+module React.VirtualDom exposing
     ( VirtualDom, text, node, nodeWithKey, isEqual, encode
     , Prop, prop, customProp
     )
@@ -18,7 +18,7 @@ module React.Internals.VirtualDom exposing
 -}
 
 import Json.Encode as Encode exposing (Value)
-import React.Internals.Hash as Hash exposing (Hash)
+import React.Hash as Hash exposing (Hash)
 import React.Json.HashedEncode as HashedEncode exposing (HashedValue)
 
 

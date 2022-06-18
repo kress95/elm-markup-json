@@ -3,7 +3,7 @@ module React.Program exposing (Program, ProgramCmd, ProgramMsg, ProgramSub, work
 import Json.Decode as Decode exposing (Decoder, Value)
 import Platform
 import React.Html as Html exposing (Html)
-import React.Internals.VirtualDom as VirtualDom
+import React.VirtualDom as VirtualDom
 
 
 type ProgramModel model

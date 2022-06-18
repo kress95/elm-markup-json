@@ -1,4 +1,4 @@
-module React.Internals.Hash exposing
+module React.Hash exposing
     ( Hash, initialSeed
     , join, combine
     , string, stringWith
