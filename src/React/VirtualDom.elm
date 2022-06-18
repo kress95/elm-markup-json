@@ -18,7 +18,7 @@ module React.VirtualDom exposing
 -}
 
 import Json.Encode as Encode exposing (Value)
-import React.Hash as Hash exposing (Hash)
+import Hash as Hash exposing (Hash)
 import Json.HashEncode as HashEncode exposing (HashedValue)
 
 

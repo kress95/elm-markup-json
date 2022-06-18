@@ -32,7 +32,7 @@ module Json.HashEncode exposing
 import Array exposing (Array)
 import Dict exposing (Dict)
 import Json.Encode as Encode exposing (Value)
-import React.Hash as Hash exposing (Hash)
+import Hash as Hash exposing (Hash)
 import Set exposing (Set)
 
 
