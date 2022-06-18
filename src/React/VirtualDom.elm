@@ -1,6 +1,6 @@
 module React.VirtualDom exposing
     ( VirtualDom, text, node, nodeWithKey, isEqual, encode
-    , Prop, attr, event
+    , Attr, prop, event
     )
 
 {-|
@@ -11,9 +11,9 @@ module React.VirtualDom exposing
 @docs VirtualDom, text, node, nodeWithKey, isEqual, encode
 
 
-# Prop
+# Attr
 
-@docs Prop, attr, event
+@docs Attr, prop, event
 
 -}
 
@@ -39,15 +39,15 @@ text txt =
     VirtualDom (HashEncode.unwrap (HashEncode.string txt))
 
 
-node : List Prop -> List VirtualDom -> VirtualDom
-node props children =
-    nodeWithKey props (List.indexedMap withIndex children)
+node : List Attr -> List VirtualDom -> VirtualDom
+node attrs children =
+    nodeWithKey attrs (List.indexedMap withIndex children)
 
 
-nodeWithKey : List Prop -> List ( HashedValue, VirtualDom ) -> VirtualDom
-nodeWithKey props children =
+nodeWithKey : List Attr -> List ( HashedValue, VirtualDom ) -> VirtualDom
+nodeWithKey attrs children =
     encodeObjectWithHash
-        [ propsEntry (encodeProps props)
+        [ propsEntry (encodeAttrs attrs)
         , childrenEntry (list encodeChild children)
         ]
         |> VirtualDom
@@ -64,21 +64,21 @@ encode (VirtualDom ( _, value )) =
 
 
 
--- Prop
+-- Attr
 
 
-type Prop
-    = Prop CachedEntry
+type Attr
+    = Attr CachedEntry
 
 
-attr : String -> (a -> HashedValue) -> (a -> Prop)
-attr name encoder =
-    prop wrapAttr name encoder
+prop : String -> (a -> HashedValue) -> (a -> Attr)
+prop name encoder =
+    attr wrapProp name encoder
 
 
-event : String -> (a -> HashedValue) -> (a -> Prop)
+event : String -> (a -> HashedValue) -> (a -> Attr)
 event name encoder =
-    prop wrapEvent name encoder
+    attr wrapEvent name encoder
 
 
 
@@ -119,34 +119,34 @@ valueEntry =
 
 
 
--- Props internals
+-- Attrs internals
 
 
-encodeProps : List Prop -> HashValuePair
-encodeProps pairs =
+encodeAttrs : List Attr -> HashValuePair
+encodeAttrs pairs =
     let
         seed =
-            List.foldl foldHashProps objectSeed pairs
+            List.foldl foldHashAttrs objectSeed pairs
     in
-    ( seed, Encode.object (( "h", Encode.int seed ) :: List.map unwrapProp pairs) )
+    ( seed, Encode.object (( "h", Encode.int seed ) :: List.map unwrapAttr pairs) )
 
 
-foldHashProps : Prop -> Int -> Int
-foldHashProps (Prop { hashForKey, hashForValue }) seed =
+foldHashAttrs : Attr -> Int -> Int
+foldHashAttrs (Attr { hashForKey, hashForValue }) seed =
     Hash.combine (Hash.join hashForKey hashForValue) seed
 
 
-unwrapProp : Prop -> ( String, Value )
-unwrapProp (Prop { entry }) =
+unwrapAttr : Attr -> ( String, Value )
+unwrapAttr (Attr { entry }) =
     entry
 
 
 
--- Prop internals
+-- Attr internals
 
 
-prop : (HashedValue -> HashValuePair) -> String -> (a -> HashedValue) -> (a -> Prop)
-prop wrap name encoder =
+attr : (HashedValue -> HashValuePair) -> String -> (a -> HashedValue) -> (a -> Attr)
+attr wrap name encoder =
     let
         hashForKey =
             HashEncode.toHash (HashEncode.string name)
@@ -160,19 +160,19 @@ prop wrap name encoder =
         , hashForValue = hashForValue
         , entry = ( name, entry )
         }
-            |> Prop
+            |> Attr
 
 
-wrapAttr : HashedValue -> HashValuePair
-wrapAttr value =
+wrapProp : HashedValue -> HashValuePair
+wrapProp value =
     encodeObject
-        [ attrEntry
+        [ propEntry
         , valueEntry (HashEncode.unwrap value)
         ]
 
 
-attrEntry : CachedEntry
-attrEntry =
+propEntry : CachedEntry
+propEntry =
     entryWith "e$" (HashEncode.unwrap (HashEncode.bool False))
 
 

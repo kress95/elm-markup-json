@@ -1,6 +1,6 @@
 module React.Html exposing
     ( Html, text, div, p, custom, customWithKey, encode
-    , Attr, attr, customAttr
+    , Attr, prop, event
     )
 
 {-|
@@ -13,14 +13,14 @@ module React.Html exposing
 
 # Attr
 
-@docs Attr, attr, customAttr
+@docs Attr, prop, event
 
 -}
 
 import Dict exposing (Dict)
 import Json.Encode exposing (Value)
-import React.VirtualDom as VirtualDom exposing (VirtualDom)
 import Json.HashEncode as HashEncode exposing (HashedValue)
+import React.VirtualDom as VirtualDom exposing (VirtualDom)
 
 
 
@@ -49,19 +49,19 @@ p =
 custom : String -> List Attr -> List VirtualDom -> VirtualDom
 custom tag =
     let
-        tagAttr =
-            toAttr tag
+        tagProp =
+            taggedWith tag
     in
-    \attrs children -> VirtualDom.nodeWithKey (tagAttr :: attrs) (List.indexedMap withKey children)
+    \attrs children -> VirtualDom.nodeWithKey (tagProp :: attrs) (List.indexedMap withKey children)
 
 
 customWithKey : String -> List Attr -> List ( HashedValue, VirtualDom ) -> VirtualDom
 customWithKey tag =
     let
-        tagAttr =
-            toAttr tag
+        tagProp =
+            taggedWith tag
     in
-    \attrs children -> VirtualDom.nodeWithKey (tagAttr :: attrs) children
+    \attrs children -> VirtualDom.nodeWithKey (tagProp :: attrs) children
 
 
 encode : Html -> Value
@@ -74,26 +74,26 @@ encode =
 
 
 type alias Attr =
-    VirtualDom.Prop
+    VirtualDom.Attr
 
 
-attr : String -> HashedValue -> Attr
-attr =
+prop : String -> (a -> HashedValue) -> (a -> Attr)
+prop =
     VirtualDom.prop
 
 
-customAttr : String -> (a -> HashedValue) -> (a -> Attr)
-customAttr =
-    VirtualDom.customProp
+event : String -> (a -> HashedValue) -> (a -> Attr)
+event =
+    VirtualDom.event
 
 
 
 -- internals
 
 
-toAttr : String -> Attr
-toAttr =
-    customAttr "tag" HashEncode.string
+taggedWith : String -> Attr
+taggedWith =
+    prop "tag" HashEncode.string
 
 
 withKey : Int -> Html -> ( HashedValue, Html )
