@@ -74,10 +74,24 @@ prop key hashedValue =
             HashEncode.unwrap hashedValue
     in
     { hashForKey = Hash.stringWith key propSeed
-    , hashForValue = hashForValue
-    , entry = ( key, value )
+    , hashForValue = Hash.join  hashForValue
+    , entry = ( key, Encode.object [value] )
     }
         |> Prop
+
+attr : HashedValue -> HashedValue
+attr value =
+    HashEncode.object
+        [ ("e$", HashEncode.bool False )
+        , ("v$", value )
+        ]
+
+event : HashedValue -> HashedValue
+event value =
+    HashEncode.object
+        [ ("e$", HashEncode.bool True )
+        , ("v$", value )
+        ]
 
 
 customProp : String -> (a -> HashedValue) -> (a -> Prop)
