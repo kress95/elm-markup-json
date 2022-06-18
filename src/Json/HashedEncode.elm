@@ -1,4 +1,4 @@
-module React.Json.HashedEncode exposing
+module Json.HashedEncode exposing
     ( HashedValue, unsafe, value, hash, isEqual
     , string, int, float, bool, null
     , list, array, set

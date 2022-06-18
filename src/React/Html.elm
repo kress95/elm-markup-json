@@ -20,7 +20,7 @@ module React.Html exposing
 import Dict exposing (Dict)
 import Json.Encode exposing (Value)
 import React.VirtualDom as VirtualDom exposing (VirtualDom)
-import React.Json.HashedEncode as HashedEncode exposing (HashedValue)
+import Json.HashedEncode as HashedEncode exposing (HashedValue)
 
 
 
