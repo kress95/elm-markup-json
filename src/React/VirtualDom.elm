@@ -1,4 +1,7 @@
-module React.VirtualDom exposing (..)
+module React.VirtualDom exposing
+    ( VirtualDom, text, node, nodeWithKey, isEqual, encode
+    , Prop, attr, event
+    )
 
 {-|
 
@@ -10,13 +13,9 @@ module React.VirtualDom exposing (..)
 
 # Prop
 
-@docs Prop, prop, customProp
+@docs Prop, attr, event
 
 -}
-
--- ( VirtualDom, text, node, nodeWithKey, isEqual, encode
--- , Prop, prop, customProp
--- )
 
 import Hash as Hash exposing (Hash)
 import Json.Encode as Encode exposing (Value)
@@ -28,7 +27,11 @@ import Json.HashEncode as HashEncode exposing (HashedValue)
 
 
 type VirtualDom
-    = VirtualDom ( Int, Value )
+    = VirtualDom HashValuePair
+
+
+type alias HashValuePair =
+    ( Hash, Value )
 
 
 text : String -> VirtualDom
@@ -43,10 +46,11 @@ node props children =
 
 nodeWithKey : List Prop -> List ( HashedValue, VirtualDom ) -> VirtualDom
 nodeWithKey props children =
-    encodeNode
+    encodeObjectWithHash
         [ propsEntry (encodeProps props)
         , childrenEntry (list encodeChild children)
         ]
+        |> VirtualDom
 
 
 isEqual : VirtualDom -> VirtualDom -> Bool
@@ -64,47 +68,21 @@ encode (VirtualDom ( _, value )) =
 
 
 type Prop
-    = Prop ObjectEntry
+    = Prop CachedEntry
 
 
-prop : String -> HashedValue -> Prop
-prop key hashedValue =
-    let
-        ( hashForValue, value ) =
-            HashEncode.unwrap hashedValue
-    in
-    { hashForKey = Hash.stringWith key propSeed
-    , hashForValue = Hash.join  hashForValue
-    , entry = ( key, Encode.object value )
-    }
-        |> Prop
-
-attr : HashedValue -> HashedValue
-attr value =
-    HashEncode.object
-        [ ("e$", HashEncode.bool False )
-        , ("v$", value )
-        ]
-
-event : HashedValue -> HashedValue
-event value =
-    HashEncode.object
-        [ ("e$", HashEncode.bool True )
-        , ("v$", value )
-        ]
+attr : String -> (a -> HashedValue) -> (a -> Prop)
+attr name encoder =
+    prop wrapAttr name encoder
 
 
-customProp : String -> (a -> HashedValue) -> (a -> Prop)
-customProp key encoder =
-    let
-        toEntry =
-            objectEntry key
-    in
-    \value -> Prop (toEntry (encoder value))
+event : String -> (a -> HashedValue) -> (a -> Prop)
+event name encoder =
+    prop wrapEvent name encoder
 
 
 
--- internals
+-- VirtualDom internals
 
 
 withIndex : Int -> VirtualDom -> ( HashedValue, VirtualDom )
@@ -112,23 +90,50 @@ withIndex index value =
     ( HashEncode.int index, value )
 
 
-encodeProps : List Prop -> ( Hash, Value )
+propsEntry : HashValuePair -> CachedEntry
+propsEntry =
+    entryWith "p$"
+
+
+childrenEntry : HashValuePair -> CachedEntry
+childrenEntry =
+    entryWith "c$"
+
+
+encodeChild : ( HashedValue, VirtualDom ) -> HashValuePair
+encodeChild ( key, VirtualDom pair ) =
+    encodeObject
+        [ keyEntry (HashEncode.unwrap key)
+        , valueEntry pair
+        ]
+
+
+keyEntry : HashValuePair -> CachedEntry
+keyEntry =
+    entryWith "k$"
+
+
+valueEntry : HashValuePair -> CachedEntry
+valueEntry =
+    entryWith "v$"
+
+
+
+-- Props internals
+
+
+encodeProps : List Prop -> HashValuePair
 encodeProps pairs =
     let
         seed =
-            List.foldl foldHashingProps propsSeed pairs
+            List.foldl foldHashProps objectSeed pairs
     in
     ( seed, Encode.object (( "h", Encode.int seed ) :: List.map unwrapProp pairs) )
 
 
-foldHashingProps : Prop -> Int -> Int
-foldHashingProps (Prop { hashForKey, hashForValue }) seed =
+foldHashProps : Prop -> Int -> Int
+foldHashProps (Prop { hashForKey, hashForValue }) seed =
     Hash.combine (Hash.join hashForKey hashForValue) seed
-
-
-propsSeed : Int
-propsSeed =
-    Hash.string "props"
 
 
 unwrapProp : Prop -> ( String, Value )
@@ -136,54 +141,85 @@ unwrapProp (Prop { entry }) =
     entry
 
 
-encodeChild : ( HashedValue, VirtualDom ) -> ( Hash, Value )
-encodeChild ( key, VirtualDom pair ) =
-    encodeChildWithKey
-        [ keyEntry key
-        , valueEntry pair
+
+-- Prop internals
+
+
+prop : (HashedValue -> HashValuePair) -> String -> (a -> HashedValue) -> (a -> Prop)
+prop wrap name encoder =
+    let
+        hashForKey =
+            HashEncode.toHash (HashEncode.string name)
+    in
+    \value ->
+        let
+            ( hashForValue, entry ) =
+                wrap (encoder value)
+        in
+        { hashForKey = hashForKey
+        , hashForValue = hashForValue
+        , entry = ( name, entry )
+        }
+            |> Prop
+
+
+wrapAttr : HashedValue -> HashValuePair
+wrapAttr value =
+    encodeObject
+        [ attrEntry
+        , valueEntry (HashEncode.unwrap value)
         ]
 
 
-propSeed : Int
-propSeed =
-    Hash.string "prop"
+attrEntry : CachedEntry
+attrEntry =
+    entryWith "e$" (HashEncode.unwrap (HashEncode.bool False))
+
+
+wrapEvent : HashedValue -> HashValuePair
+wrapEvent value =
+    encodeObject
+        [ eventEntry
+        , valueEntry (HashEncode.unwrap value)
+        ]
+
+
+eventEntry : CachedEntry
+eventEntry =
+    entryWith "e$" (HashEncode.unwrap (HashEncode.bool True))
 
 
 
--- super internal speed hacks
+-- CachedEntry internals
 
 
-type alias ObjectEntry =
+type alias CachedEntry =
     { hashForKey : Hash
     , hashForValue : Hash
     , entry : ( String, Value )
     }
 
 
-encodeChildWithKey : List ObjectEntry -> ( Hash, Value )
-encodeChildWithKey pairs =
-    ( List.foldl foldHashingEntries objectSeed pairs
-    , Encode.object (List.map unwrapEntryHashedKey pairs)
+encodeObject : List CachedEntry -> HashValuePair
+encodeObject pairs =
+    ( List.foldl foldHashEntries objectSeed pairs
+    , Encode.object (List.map getEntry pairs)
     )
 
 
-encodeNode : List ObjectEntry -> VirtualDom
-encodeNode pairs =
+encodeObjectWithHash : List CachedEntry -> HashValuePair
+encodeObjectWithHash pairs =
     let
         seed =
-            List.foldl foldHashingEntries objectSeed pairs
+            List.foldl foldHashEntries objectSeed pairs
     in
     ( seed
-    , Encode.object
-        (( "h", Encode.int seed )
-            :: List.map unwrapEntryHashedKey pairs
-        )
+    , Encode.object (( "h$", Encode.int seed ) :: List.map getEntry pairs)
     )
-        |> VirtualDom
 
 
-foldHashingEntries : ObjectEntry -> Int -> Int
-foldHashingEntries { hashForKey, hashForValue } seed =
+foldHashEntries : CachedEntry -> Int -> Int
+foldHashEntries { hashForKey, hashForValue } seed =
     Hash.combine (Hash.join hashForKey hashForValue) seed
 
 
@@ -192,51 +228,13 @@ objectSeed =
     Hash.string "object"
 
 
-arraySeed : Int
-arraySeed =
-    Hash.string "array"
+getEntry : CachedEntry -> ( String, Value )
+getEntry =
+    .entry
 
 
-unwrapEntryHashedKey : ObjectEntry -> ( String, Value )
-unwrapEntryHashedKey { entry } =
-    entry
-
-
-keyEntry : HashedValue -> ObjectEntry
-keyEntry =
-    objectEntry "k$"
-
-
-valueEntry : ( Hash, Value ) -> ObjectEntry
-valueEntry =
-    objectEntry2 "v$"
-
-
-propsEntry : ( Hash, Value ) -> ObjectEntry
-propsEntry =
-    objectEntry2 "p$"
-
-
-childrenEntry : ( Hash, Value ) -> ObjectEntry
-childrenEntry =
-    objectEntry2 "c$"
-
-
-objectEntry : String -> HashedValue -> ObjectEntry
-objectEntry key =
-    let
-        hashForKey =
-            HashEncode.toHash (HashEncode.string key)
-    in
-    \value ->
-        { hashForKey = hashForKey
-        , hashForValue = HashEncode.toHash value
-        , entry = ( key, HashEncode.toValue value )
-        }
-
-
-objectEntry2 : String -> ( Hash, Value ) -> ObjectEntry
-objectEntry2 key =
+entryWith : String -> HashValuePair -> CachedEntry
+entryWith key =
     let
         hashForKey =
             HashEncode.toHash (HashEncode.string key)
@@ -248,12 +246,21 @@ objectEntry2 key =
         }
 
 
-list : (value -> ( Hash, Value )) -> List value -> ( Hash, Value )
+
+-- List HashValuePair internals
+
+
+list : (value -> HashValuePair) -> List value -> HashValuePair
 list func entries =
     listHelp arraySeed func entries
 
 
-listHelp : Int -> (value -> ( Hash, Value )) -> List value -> ( Hash, Value )
+arraySeed : Int
+arraySeed =
+    Hash.string "array"
+
+
+listHelp : Int -> (value -> HashValuePair) -> List value -> HashValuePair
 listHelp seed func entries =
     let
         values =
@@ -264,11 +271,11 @@ listHelp seed func entries =
     )
 
 
-hashValue : ( Hash, Value ) -> Int -> Int
+hashValue : HashValuePair -> Int -> Int
 hashValue ( seed, _ ) =
     Hash.join seed
 
 
-toValue : ( Hash, Value ) -> Value
+toValue : HashValuePair -> Value
 toValue ( _, value ) =
     value
