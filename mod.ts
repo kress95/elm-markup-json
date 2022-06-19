@@ -3,35 +3,19 @@ import React from "https://esm.sh/react@18.1.0";
 export type Tree = string | Node;
 
 export interface Node {
-  // self hash
   hash: number;
-
-  // optional tag (fallbacks to "g")
   tag?: string;
-
-  // attributes hash
   attributesHash: number;
-
-  // attributes record
   attributes: Attributes;
-
-  // children hash
   childrenHash: number;
-
-  // children nodes
   children: Children;
 }
 
 export type Attributes = Record<string, Attribute>;
 
 export interface Attribute {
-  // attribute hash
   hash: number;
-
-  // event flag
   event: boolean;
-
-  // attribute value
   value: unknown;
 }
 
@@ -41,13 +25,8 @@ export type Children = Child[];
 export type Key = any;
 
 export interface Child {
-  // child hash
   hash: number;
-
-  // child key
   key: Key;
-
-  // child node
   value: Tree;
 }
 
@@ -148,7 +127,7 @@ function getDerivedChilds(
   children: Children,
   send: Send
 ): NodeChilds {
-  // this probably have space for additional optimizations using children key
+  // maybe optimize using children key
   return children.map((child, index) => {
     if (child.hash === pastChildren[index]?.hash) return pastChilds[index];
     const { key, value: node } = child;
