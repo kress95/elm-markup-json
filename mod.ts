@@ -1,74 +1,241 @@
-import React, { ReactNode } from "https://esm.sh/react@18.1.0";
+import React from "https://esm.sh/react@18.1.0";
 
-type Html = string | { html: true; tag: string; props: Record<string, unknown>; events: Record<string, unknown>; children: Html[] };
+export type Tree = string | Node;
 
-export type Changeset =
-  | null
-  | Html
-  | { html: false; tag?: string; props?: Record<string, unknown>; events?: Record<string, unknown>; children?: Changeset[] };
+export interface Node {
+  // self hash
+  hash: number;
 
-const emptyObject = {};
-const emptyHtml: Html[] = [];
+  // optional tag (fallbacks to "g")
+  tag?: string;
 
-function htmlFromChangeset(changeset: Changeset): Html {
-  if (changeset === null) return "";
-  if (typeof changeset === "string") return changeset;
+  // attributes hash
+  attributesHash: number;
 
-  const { tag } = changeset;
+  // attributes record
+  attributes: Attributes;
 
-  if (tag == null) return "";
+  // children hash
+  childrenHash: number;
 
-  return {
-    html: true,
-    tag,
-    props: changeset.props ?? emptyObject,
-    children: changeset.children?.map(htmlFromChangeset) ?? emptyHtml
-  };
+  // children nodes
+  children: Children;
 }
 
-function applyChangeset(html: Html, changeset: Changeset): Html {
-  if (changeset === null) return html;
-  if (typeof changeset === "string") return changeset;
-  if (typeof html === "string") return htmlFromChangeset(changeset);
-  if (changeset.html) return changeset;
+export type Attributes = Record<string, Attribute>;
 
-  const { children } = html;
+export interface Attribute {
+  // attribute hash
+  hash: number;
 
-  return {
-    html: true,
-    tag: changeset.tag ?? html.tag,
-    props: changeset.props ?? html.props,
-    children:
-      changeset.children?.map((value, key) => {
-        return applyChangeset(children[key], value);
-      }) ?? html.children,
-  };
+  // event flag
+  event: boolean;
+
+  // attribute value
+  value: unknown;
 }
 
-function renderHtml(html: Html): string | ReactNode {
-  if (typeof html === "string") return html;
-  return React.createElement(html.tag, html.props, html.children.map(renderHtml));
+export type Children = Child[];
+
+// deno-lint-ignore no-explicit-any
+export type Key = any;
+
+export interface Child {
+  // child hash
+  hash: number;
+
+  // child key
+  key: Key;
+
+  // child node
+  value: Tree;
+}
+
+export interface Event {
+  context: unknown;
+  value: unknown;
+}
+
+export interface Send {
+  (msg: Event): void;
+}
+
+export interface PortToElm {
+  send: Send;
+}
+
+export interface PortFromElm {
+  subscribe(handler: (tree: Tree) => void): void;
+  unsubscribe(handler: (tree: Tree) => void): void;
 }
 
 export interface Props {
-  changeset: Changeset;
+  toElm: PortToElm;
+  fromElm: PortFromElm;
 }
 
-export interface State {
-  html: Html;
-}
-
-export class Renderer extends React.Component<Props, State> {
+export class Renderer extends React.Component<Props, { tree: Tree }> {
   constructor(props: Props) {
     super(props);
-    this.state = { html: "" };
+    this.state = { tree: "" };
   }
 
-  static getDerivedStateFromProps(props: Props, state: State) {
-    return { html: applyChangeset(state.html, props.changeset) };
+  handleHtml = (tree: Tree) => {
+    this.setState({ tree });
+  };
+
+  componentDidMount() {
+    this.props.fromElm.subscribe(this.handleHtml);
+  }
+
+  componentWillUnmount() {
+    this.props.fromElm.unsubscribe(this.handleHtml);
+  }
+
+  // TODO: maybe include getDerivedStateFromProps and shouldComponentUpdate
+
+  render() {
+    const { tree } = this.state;
+    if (typeof tree === "string") return tree;
+    return React.createElement(NodeRenderer, { node: tree, send: this.props.toElm.send });
+  }
+}
+
+// internals
+
+interface NodeRendererProps {
+  key?: Key;
+  node: Node;
+  send: Send;
+}
+
+type NodeProps = Record<string, unknown>;
+type NodeChilds = Array<string | NodeChild>;
+type NodeChild = React.CElement<NodeRendererProps, NodeRenderer>;
+
+interface NodeRendererState {
+  node: Node;
+  properties: NodeProps;
+  children: NodeChilds;
+}
+
+function getDerivedProps(
+  pastProps: NodeProps,
+  pastAttrs: Attributes,
+  attrs: Attributes,
+  key?: Key
+) {
+  const props: Record<string, unknown> = key == null ? {} : { key };
+
+  for (const name in attrs) {
+    const attr = attrs[name];
+
+    if (attr.hash === pastAttrs[name]?.hash) {
+      props[name] = pastProps[name];
+    } else if (attr.event) {
+      console.log("todo event " + name);
+    } else {
+      props[name] = attr.value;
+    }
+  }
+
+  return props;
+}
+
+function getDerivedChilds(
+  pastChilds: NodeChilds,
+  pastChildren: Children,
+  children: Children,
+  send: Send
+): NodeChilds {
+  // this probably have space for additional optimizations using children key
+  return children.map((child, index) => {
+    if (child.hash === pastChildren[index]?.hash) return pastChilds[index];
+    const { key, value: node } = child;
+    if (typeof node === "string") return node;
+    return React.createElement(NodeRenderer, {
+      key,
+      node,
+      send,
+    });
+  });
+}
+
+function getEventHandler(context: unknown, send: Send) {
+  return (value: unknown) => send({ context, value });
+}
+
+class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState> {
+  constructor(props: NodeRendererProps) {
+    super(props);
+
+    const { key, node } = this.props;
+
+    this.state = {
+      node,
+      properties: this.initializeProps(node.attributes, props.send, key),
+      children: node.children.map(this.initializeChild),
+    };
+  }
+
+  initializeProps(attrs: Attributes, send: Send, key?: unknown) {
+    const props: Record<string, unknown> = key == null ? {} : { key };
+
+    for (const name in attrs) {
+      const attr = attrs[name];
+      if (attr.event) {
+        console.log("todo event " + name);
+        props[name] = getEventHandler(attr.value, send);
+      } else {
+        props[name] = attr.value;
+      }
+    }
+
+    return props;
+  }
+
+  initializeChild = (child: Child) => {
+    const { value } = child;
+    if (typeof value === "string") return value;
+    return React.createElement(NodeRenderer, {
+      key: child.key,
+      node: value,
+      send: this.props.send,
+    });
+  };
+
+  static getDerivedStateFromProps(
+    { key, node, send }: NodeRendererProps,
+    state: NodeRendererState
+  ) {
+    const { node: pastNode } = state;
+
+    if (pastNode.hash === node.hash) return state;
+
+    return {
+      node,
+      send,
+      properties:
+        pastNode.attributesHash === node.attributesHash
+          ? state.properties
+          : getDerivedProps(state.properties, pastNode.attributes, node.attributes, key),
+      children:
+        pastNode.childrenHash === node.childrenHash
+          ? state.children
+          : getDerivedChilds(state.children, pastNode.children, node.children, send),
+    };
+  }
+
+  shouldComponentUpdate(props: NodeRendererProps) {
+    return this.props.node.hash !== props.node.hash;
   }
 
   render() {
-    return renderHtml(this.state.html);
+    const {
+      node: { tag },
+      properties,
+      children,
+    } = this.state;
+    return React.createElement(tag ?? "g", properties, children);
   }
 }
