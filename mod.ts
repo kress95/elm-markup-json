@@ -53,7 +53,11 @@ export interface Props {
   fromElm: PortFromElm;
 }
 
-export class Renderer extends React.Component<Props, { tree: Tree }> {
+interface State {
+  tree: Tree;
+}
+
+export class Renderer extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { tree: "" };
@@ -71,7 +75,12 @@ export class Renderer extends React.Component<Props, { tree: Tree }> {
     this.props.fromElm.unsubscribe(this.handleHtml);
   }
 
-  // TODO: maybe include getDerivedStateFromProps and shouldComponentUpdate
+  shouldComponentUpdate(_nextProps: Props, { tree: nextTree }: State) {
+    if (typeof nextTree === "string") return true;
+    const { tree } = this.state;
+    if (typeof tree === "string") return true;
+    return nextTree.hash !== tree.hash;
+  }
 
   render() {
     const { tree } = this.state;
@@ -91,19 +100,18 @@ interface NodeRendererProps {
 type NodeProps = Record<string, unknown>;
 type NodeChilds = Array<string | NodeChild>;
 type NodeChild = React.CElement<NodeRendererProps, NodeRenderer>;
+type NodeHashes = Record<Key, number>;
+type NodeRefs = Record<Key, NodeChild>;
 
 interface NodeRendererState {
   node: Node;
-  properties: NodeProps;
-  children: NodeChilds;
+  props: NodeProps;
+  childs: NodeChilds;
+  hashes: NodeHashes;
+  refs: NodeRefs;
 }
 
-function getDerivedProps(
-  pastProps: NodeProps,
-  pastAttrs: Attributes,
-  attrs: Attributes,
-  key?: Key
-) {
+function getDerivedProps(attrs: Attributes, key: Key, pastProps: NodeProps, pastAttrs: Attributes) {
   const props: Record<string, unknown> = key == null ? {} : { key };
 
   for (const name in attrs) {
@@ -122,21 +130,24 @@ function getDerivedProps(
 }
 
 function getDerivedChilds(
-  pastChilds: NodeChilds,
-  pastChildren: Children,
   children: Children,
-  send: Send
+  hashes: NodeHashes,
+  refs: NodeRefs,
+  send: Send,
+  pastHashes: NodeHashes,
+  pastRefs: NodeRefs
 ): NodeChilds {
-  // maybe optimize using children key
-  return children.map((child, index) => {
-    if (child.hash === pastChildren[index]?.hash) return pastChilds[index];
-    const { key, value: node } = child;
-    if (typeof node === "string") return node;
-    return React.createElement(NodeRenderer, {
-      key,
-      node,
+  return children.map((child) => {
+    const { value } = child;
+    if (typeof value === "string") return value;
+    const { key } = child;
+    if (child.hash === pastHashes[key]) return pastRefs[key];
+    hashes[key] = child.hash;
+    return (refs[child.key] = React.createElement(NodeRenderer, {
+      key: child.key,
+      node: value,
       send,
-    });
+    }));
   });
 }
 
@@ -145,43 +156,48 @@ function getEventHandler(context: unknown, send: Send) {
 }
 
 class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState> {
-  constructor(props: NodeRendererProps) {
-    super(props);
+  constructor(config: NodeRendererProps) {
+    super(config);
 
-    const { key, node } = this.props;
+    const { node, key } = config;
+
+    const hashes = {};
+    const refs = {};
 
     this.state = {
       node,
-      properties: this.initializeProps(node.attributes, props.send, key),
-      children: node.children.map(this.initializeChild),
+      props: this.initializeProperties(node.attributes, config.send, key),
+      childs: this.initializeChildren(node.children, hashes, refs),
+      hashes,
+      refs,
     };
   }
 
-  initializeProps(attrs: Attributes, send: Send, key?: unknown) {
-    const props: Record<string, unknown> = key == null ? {} : { key };
-
-    for (const name in attrs) {
-      const attr = attrs[name];
+  initializeProperties(attributes: Attributes, send: Send, key?: Key) {
+    const props: NodeProps = key == null ? {} : { key };
+    for (const name in attributes) {
+      const attr = attributes[name];
       if (attr.event) {
-        console.log("todo event " + name);
         props[name] = getEventHandler(attr.value, send);
       } else {
         props[name] = attr.value;
       }
     }
-
     return props;
   }
 
-  initializeChild = (child: Child) => {
-    const { value } = child;
-    if (typeof value === "string") return value;
-    return React.createElement(NodeRenderer, {
-      key: child.key,
-      node: value,
-      send: this.props.send,
+  initializeChildren(children: Children, hashes: NodeHashes, refs: NodeRefs) {
+    return children.map((child) => {
+      const { value } = child;
+      if (typeof value === "string") return value;
+      hashes[child.key] = child.hash;
+      return (refs[child.key] = React.createElement(NodeRenderer, {
+        key: child.key,
+        node: value,
+        send: this.props.send,
+      }));
     });
-  };
+  }
 
   static getDerivedStateFromProps(
     { key, node, send }: NodeRendererProps,
@@ -191,17 +207,22 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
 
     if (pastNode.hash === node.hash) return state;
 
+    const hashes: NodeHashes = {};
+    const refs: NodeRefs = {};
+
     return {
       node,
       send,
-      properties:
+      props:
         pastNode.attributesHash === node.attributesHash
-          ? state.properties
-          : getDerivedProps(state.properties, pastNode.attributes, node.attributes, key),
-      children:
+          ? state.props
+          : getDerivedProps(node.attributes, key, state.props, pastNode.attributes),
+      childs:
         pastNode.childrenHash === node.childrenHash
-          ? state.children
-          : getDerivedChilds(state.children, pastNode.children, node.children, send),
+          ? state.childs
+          : getDerivedChilds(node.children, hashes, refs, send, state.hashes, state.refs),
+      hashes,
+      refs,
     };
   }
 
@@ -212,9 +233,9 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
   render() {
     const {
       node: { tag },
-      properties,
-      children,
+      props,
+      childs,
     } = this.state;
-    return React.createElement(tag ?? "g", properties, children);
+    return React.createElement(tag ?? "g", props, childs);
   }
 }
