@@ -1,34 +1,30 @@
-module Markup exposing (Attribute, Key, Markup, Tag, key, node, tag, tagNode, text)
+module Markup exposing
+    ( Markup, node, tagNode, text
+    , Tag, tag
+    , Key, key
+    , Attribute, at, ev, attribute, event
+    )
+
+{-|
+
+
+# Markup
+
+@docs Markup, node, tagNode, text
+@docs Tag, tag
+@docs Key, key
+
+
+# Attribute
+
+@docs Attribute, at, ev, attribute, event
+
+-}
 
 import FNV1a
 import Json.Encode as Encode exposing (Value)
+import Json.HashEncode as HashEncode exposing (HashedValue)
 import Markup.Hash as Hash exposing (Hash)
-
-
-
--- Attributes
-
-
-type Attribute
-    = Attribute Hash Hash ( String, Value )
-
-
-
--- Attributes internals
-
-
-hashAttributes : List Attribute -> Hash
-hashAttributes =
-    List.foldl
-        (\(Attribute keyHash valueHash _) -> Hash.combine (Hash.join keyHash valueHash))
-        (FNV1a.hash "attributes")
-
-
-encodeAttributes : List Attribute -> Value
-encodeAttributes =
-    List.map
-        (\(Attribute _ _ pair) -> pair)
-        >> Encode.object
 
 
 
@@ -66,18 +62,18 @@ tagNode (Tag tagHash tagValue) attrs entries =
         entriesHash =
             hashEntries entries
 
-        seed =
+        hash =
             Hash.join entriesHash (Hash.join attrsHash tagHash)
     in
-    ( seed
+    ( hash
     , Encode.object
         [ ( "tag", tagValue )
-        , ( "hash", Encode.int seed )
+        , ( "hash", Encode.int hash )
         , ( "attrsHash", Encode.int attrsHash )
         , ( "attrs", encodeAttributes attrs )
         , ( "entriesHash", Encode.int entriesHash )
         , ( "entries", encodeEntries entries )
-        , ( "cache", encodeCache entries )
+        , ( "keyed", encodeKeyed entries )
         ]
     )
         |> Markup
@@ -92,17 +88,17 @@ node attrs entries =
         entriesHash =
             hashEntries entries
 
-        seed =
+        hash =
             Hash.join attrsHash entriesHash
     in
-    ( seed
+    ( hash
     , Encode.object
-        [ ( "hash", Encode.int seed )
+        [ ( "hash", Encode.int hash )
         , ( "attrsHash", Encode.int attrsHash )
         , ( "attrs", encodeAttributes attrs )
         , ( "entriesHash", Encode.int entriesHash )
         , ( "entries", encodeEntries entries )
-        , ( "cache", encodeCache entries )
+        , ( "keyed", encodeKeyed entries )
         ]
     )
         |> Markup
@@ -115,6 +111,20 @@ text str =
 
 
 -- Markup internals
+
+
+hashAttributes : List Attribute -> Hash
+hashAttributes =
+    List.foldl
+        (\(Attribute keyHash valueHash _) -> Hash.combine (Hash.join keyHash valueHash))
+        (FNV1a.hash "attributes")
+
+
+encodeAttributes : List Attribute -> Value
+encodeAttributes =
+    List.map
+        (\(Attribute _ _ pair) -> pair)
+        >> Encode.object
 
 
 tagSeed : Hash
@@ -134,8 +144,8 @@ hashEntries =
         (FNV1a.hash "entries")
 
 
-encodeCache : List ( Key, Markup ) -> Value
-encodeCache =
+encodeKeyed : List ( Key, Markup ) -> Value
+encodeKeyed =
     List.map
         (\( Key _ k _, Markup ( _, v ) ) -> ( k, v ))
         >> Encode.object
@@ -154,3 +164,111 @@ encodeEntries =
 textSeed : Hash
 textSeed =
     FNV1a.hash "text"
+
+
+
+-- Attributes
+
+
+type Attribute
+    = Attribute Hash Hash ( String, Value )
+
+
+at : String -> HashedValue -> Attribute
+at str value =
+    let
+        valueHash =
+            HashEncode.toHash value
+    in
+    Attribute
+        (FNV1a.hashWithSeed str attributeSeed)
+        valueHash
+        ( str, encodeAttribute valueHash (HashEncode.toValue value) )
+
+
+ev : String -> HashedValue -> Attribute
+ev str value =
+    let
+        valueHash =
+            Hash.join (HashEncode.toHash value) eventSeed
+    in
+    Attribute
+        (FNV1a.hashWithSeed str attributeSeed)
+        valueHash
+        ( str, encodeEvent valueHash (HashEncode.toValue value) )
+
+
+attribute : String -> HashedValue -> Attribute
+attribute str =
+    let
+        keyHash =
+            FNV1a.hashWithSeed str attributeSeed
+    in
+    \value ->
+        let
+            valueHash =
+                HashEncode.toHash value
+        in
+        Attribute
+            keyHash
+            valueHash
+            ( str, encodeAttribute valueHash (HashEncode.toValue value) )
+
+
+event : String -> HashedValue -> Attribute
+event str =
+    let
+        keyHash =
+            FNV1a.hashWithSeed str attributeSeed
+    in
+    \value ->
+        let
+            valueHash =
+                Hash.join (HashEncode.toHash value) eventSeed
+        in
+        Attribute
+            keyHash
+            valueHash
+            ( str, encodeEvent valueHash (HashEncode.toValue value) )
+
+
+
+-- Attributes internals
+
+
+attributeSeed : Hash
+attributeSeed =
+    FNV1a.hash "attribute"
+
+
+encodeAttribute : Hash -> Value -> Value
+encodeAttribute hash context =
+    Encode.object
+        [ ( "hash", Encode.int hash )
+        , attributeTag
+        , ( "context", context )
+        ]
+
+
+attributeTag : ( String, Value )
+attributeTag =
+    ( "event", Encode.bool False )
+
+
+eventSeed : Hash
+eventSeed =
+    FNV1a.hash "event"
+
+
+encodeEvent : Hash -> Value -> Value
+encodeEvent hash context =
+    Encode.object
+        [ ( "hash", Encode.int hash )
+        , eventTag
+        , ( "context", context )
+        ]
+
+
+eventTag : ( String, Value )
+eventTag =
+    ( "event", Encode.bool True )
