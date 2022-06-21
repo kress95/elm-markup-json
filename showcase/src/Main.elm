@@ -2,8 +2,8 @@ port module Main exposing (main)
 
 import Json.Decode as Decode exposing (Value)
 import Process
-import React exposing (Program)
-import React.Html as Html exposing (Html)
+import Markup.Program exposing (Program, program)
+import Markup.Html as Html exposing (Html)
 import Task
 
 
@@ -16,9 +16,9 @@ type Msg
     | Interval
 
 
-main : React.Program {} Model Msg
+main : Program {} Model Msg
 main =
-    React.program
+    program
         { init = init
         , view = view
         , update = update
