@@ -72,8 +72,8 @@ tagNode (Tag tagSeed tagValue) attrs entries =
     Markup
         seed
         (Encode.object
-            [ ( "tag", tagValue )
-            , ( "hash", Encode.int seed )
+            [ ( "hash", Encode.int seed )
+            , ( "tag", tagValue )
             , ( "attrsHash", Encode.int attrsSeed )
             , ( "attrs", encodeAttributes attrs )
             , ( "entriesHash", Encode.int entriesSeed )
@@ -158,13 +158,6 @@ hashEntries =
         (FNV1a.hash "entries")
 
 
-encodeKeyed : List ( Key, Markup ) -> Value
-encodeKeyed =
-    List.map
-        (\( Key _ key_ _, Markup _ value ) -> ( key_, value ))
-        >> Encode.object
-
-
 encodeEntries : List ( Key, Markup ) -> Value
 encodeEntries =
     Encode.list <|
@@ -173,6 +166,13 @@ encodeEntries =
                 [ ( "key", key_ )
                 , ( "value", value )
                 ]
+
+
+encodeKeyed : List ( Key, Markup ) -> Value
+encodeKeyed =
+    List.map
+        (\( Key _ key_ _, Markup _ value ) -> ( key_, value ))
+        >> Encode.object
 
 
 seedForText : Seed

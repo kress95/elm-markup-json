@@ -1,14 +1,15 @@
 import React from "https://esm.sh/react@18.1.0";
 
-export type Tree = string | Node;
+export type Markup = string | Node;
 
 export interface Node {
   hash: number;
   tag?: string;
-  attributesHash: number;
-  attributes: Attributes;
-  childrenHash: number;
-  children: Children;
+  attrsHash: number;
+  attrs: Attributes;
+  entriesHash: number;
+  entries: Entries;
+  keyed: Keyed;
 }
 
 export type Attributes = Record<string, Attribute>;
@@ -19,16 +20,16 @@ export interface Attribute {
   value: unknown;
 }
 
-export type Children = Child[];
+export type Entries = Entry[];
 
-// deno-lint-ignore no-explicit-any
-export type Key = any;
+export type Key = string;
 
-export interface Child {
-  hash: number;
+export interface Entry {
   key: Key;
-  value: Tree;
+  value: Node;
 }
+
+export type Keyed = Record<string, Node>;
 
 export interface Event {
   context: unknown;
@@ -44,8 +45,8 @@ export interface PortToElm {
 }
 
 export interface PortFromElm {
-  subscribe(handler: (tree: Tree) => void): void;
-  unsubscribe(handler: (tree: Tree) => void): void;
+  subscribe(handler: (markup: Markup) => void): void;
+  unsubscribe(handler: (markup: Markup) => void): void;
 }
 
 export interface Props {
@@ -54,17 +55,17 @@ export interface Props {
 }
 
 interface State {
-  tree: Tree;
+  html: Markup;
 }
 
 export class Renderer extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { tree: "" };
+    this.state = { html: "" };
   }
 
-  handleHtml = (tree: Tree) => {
-    this.setState({ tree });
+  handleHtml = (html: Markup) => {
+    this.setState({ html });
   };
 
   componentDidMount() {
@@ -75,44 +76,55 @@ export class Renderer extends React.Component<Props, State> {
     this.props.fromElm.unsubscribe(this.handleHtml);
   }
 
-  shouldComponentUpdate(_nextProps: Props, { tree: nextTree }: State) {
-    if (typeof nextTree === "string") return true;
-    const { tree } = this.state;
-    if (typeof tree === "string") return true;
-    return nextTree.hash !== tree.hash;
+  shouldComponentUpdate(_nextProps: Props, { html: nextHtml }: State) {
+    if (typeof nextHtml === "string") return true;
+    const { html } = this.state;
+    if (typeof html === "string") return true;
+    return nextHtml.hash !== html.hash;
   }
 
   render() {
-    const { tree } = this.state;
-    if (typeof tree === "string") return tree;
-    return React.createElement(NodeRenderer, { node: tree, send: this.props.toElm.send });
+    const { html } = this.state;
+    if (typeof html === "string") return html;
+    return React.createElement(NodeRenderer, {
+      node: html,
+      send: this.props.toElm.send,
+    });
   }
 }
 
 // internals
 
 interface NodeRendererProps {
-  key?: Key;
+  key?: Key | undefined;
   node: Node;
   send: Send;
 }
 
 type NodeProps = Record<string, unknown>;
-type NodeChilds = Array<string | NodeChild>;
+type NodeChildren = Array<string | NodeChild>;
 type NodeChild = React.CElement<NodeRendererProps, NodeRenderer>;
-type NodeHashes = Record<Key, number>;
-type NodeRefs = Record<Key, NodeChild>;
+type NodeCache = Record<Key, NodeChild>;
 
 interface NodeRendererState {
   node: Node;
   props: NodeProps;
-  childs: NodeChilds;
-  hashes: NodeHashes;
-  refs: NodeRefs;
+  children: NodeChildren;
+  cache: NodeCache;
 }
 
-function getDerivedProps(attrs: Attributes, key: Key, pastProps: NodeProps, pastAttrs: Attributes) {
-  const props: Record<string, unknown> = key == null ? {} : { key };
+function getEventHandler(context: unknown, send: Send) {
+  return (value: unknown) => send({ context, value });
+}
+
+function getDerivedProps(
+  attrs: Attributes,
+  send: Send,
+  key: Key | undefined,
+  pastAttrs: Attributes,
+  pastProps: NodeProps,
+) {
+  const props: Record<string, unknown> = key === undefined ? {} : { key };
 
   for (const name in attrs) {
     const attr = attrs[name];
@@ -120,7 +132,7 @@ function getDerivedProps(attrs: Attributes, key: Key, pastProps: NodeProps, past
     if (attr.hash === pastAttrs[name]?.hash) {
       props[name] = pastProps[name];
     } else if (attr.event) {
-      console.log("todo event " + name);
+      props[name] = getEventHandler(attr.value, send);
     } else {
       props[name] = attr.value;
     }
@@ -129,52 +141,46 @@ function getDerivedProps(attrs: Attributes, key: Key, pastProps: NodeProps, past
   return props;
 }
 
-function getDerivedChilds(
-  children: Children,
-  hashes: NodeHashes,
-  refs: NodeRefs,
+function getDerivedChildren(
+  entries: Entries,
+  cache: NodeCache,
   send: Send,
-  pastHashes: NodeHashes,
-  pastRefs: NodeRefs
-): NodeChilds {
-  return children.map((child) => {
-    const { value } = child;
-    if (typeof value === "string") return value;
-    const { key } = child;
-    if (child.hash === pastHashes[key]) return pastRefs[key];
-    hashes[key] = child.hash;
-    return (refs[child.key] = React.createElement(NodeRenderer, {
-      key: child.key,
-      node: value,
+  pastKeyed: Keyed,
+  pastCache: NodeCache,
+): NodeChildren {
+  return entries.map((entry) => {
+    const { value: node } = entry;
+    if (typeof node === "string") return node;
+    const { key } = entry;
+    const pastValue = pastKeyed[key];
+    if (node.hash === pastValue.hash) return pastCache[key];
+    return (cache[key] = React.createElement(NodeRenderer, {
+      key,
+      node,
       send,
     }));
   });
 }
 
-function getEventHandler(context: unknown, send: Send) {
-  return (value: unknown) => send({ context, value });
-}
-
-class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState> {
+class NodeRenderer
+  extends React.Component<NodeRendererProps, NodeRendererState> {
   constructor(config: NodeRendererProps) {
     super(config);
 
-    const { node, key } = config;
+    const { node, key, send } = config;
 
-    const hashes = {};
-    const refs = {};
+    const cache = {};
 
     this.state = {
       node,
-      props: this.initializeProperties(node.attributes, config.send, key),
-      childs: this.initializeChildren(node.children, hashes, refs),
-      hashes,
-      refs,
+      props: this.initializeProps(node.attrs, send, key),
+      children: this.initializeChildren(node.entries, cache, send),
+      cache,
     };
   }
 
-  initializeProperties(attributes: Attributes, send: Send, key?: Key) {
-    const props: NodeProps = key == null ? {} : { key };
+  initializeProps(attributes: Attributes, send: Send, key?: Key) {
+    const props: NodeProps = key === undefined ? {} : { key };
     for (const name in attributes) {
       const attr = attributes[name];
       if (attr.event) {
@@ -186,43 +192,42 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
     return props;
   }
 
-  initializeChildren(children: Children, hashes: NodeHashes, refs: NodeRefs) {
-    return children.map((child) => {
-      const { value } = child;
-      if (typeof value === "string") return value;
-      hashes[child.key] = child.hash;
-      return (refs[child.key] = React.createElement(NodeRenderer, {
-        key: child.key,
-        node: value,
-        send: this.props.send,
+  initializeChildren(entries: Entries, cache: NodeCache, send: Send) {
+    return entries.map((entry) => {
+      const { value: node } = entry;
+      if (typeof node === "string") return node;
+      const { key } = entry;
+      return (cache[key] = React.createElement(NodeRenderer, {
+        key,
+        node,
+        send,
       }));
     });
   }
 
   static getDerivedStateFromProps(
     { key, node, send }: NodeRendererProps,
-    state: NodeRendererState
+    state: NodeRendererState,
   ) {
     const { node: pastNode } = state;
-
     if (pastNode.hash === node.hash) return state;
-
-    const hashes: NodeHashes = {};
-    const refs: NodeRefs = {};
-
+    const cache: NodeCache = {};
     return {
       node,
       send,
-      props:
-        pastNode.attributesHash === node.attributesHash
-          ? state.props
-          : getDerivedProps(node.attributes, key, state.props, pastNode.attributes),
-      childs:
-        pastNode.childrenHash === node.childrenHash
-          ? state.childs
-          : getDerivedChilds(node.children, hashes, refs, send, state.hashes, state.refs),
-      hashes,
-      refs,
+      props: pastNode.attrsHash === node.attrsHash
+        ? state.props
+        : getDerivedProps(node.attrs, send, key, pastNode.attrs, state.props),
+      children: pastNode.entriesHash === node.entriesHash
+        ? state.children
+        : getDerivedChildren(
+          node.entries,
+          cache,
+          send,
+          pastNode.keyed,
+          state.cache,
+        ),
+      cache,
     };
   }
 
@@ -234,8 +239,8 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
     const {
       node: { tag },
       props,
-      childs,
+      children,
     } = this.state;
-    return React.createElement(tag ?? "g", props, childs);
+    return React.createElement(tag ?? "g", props, children);
   }
 }
