@@ -32,7 +32,7 @@ import Json.HashEncode as HashEncode exposing (HashValue)
 
 
 type Markup
-    = Markup ( Seed, Value )
+    = Markup Seed Value
 
 
 type alias Seed =
@@ -69,18 +69,18 @@ tagNode (Tag tagSeed tagValue) attrs entries =
         seed =
             joinSeed entriesSeed (joinSeed attrsSeed tagSeed)
     in
-    ( seed
-    , Encode.object
-        [ ( "tag", tagValue )
-        , ( "hash", Encode.int seed )
-        , ( "attrsHash", Encode.int attrsSeed )
-        , ( "attrs", encodeAttributes attrs )
-        , ( "entriesHash", Encode.int entriesSeed )
-        , ( "entries", encodeEntries entries )
-        , ( "keyed", encodeKeyed entries )
-        ]
-    )
-        |> Markup
+    Markup
+        seed
+        (Encode.object
+            [ ( "tag", tagValue )
+            , ( "hash", Encode.int seed )
+            , ( "attrsHash", Encode.int attrsSeed )
+            , ( "attrs", encodeAttributes attrs )
+            , ( "entriesHash", Encode.int entriesSeed )
+            , ( "entries", encodeEntries entries )
+            , ( "keyed", encodeKeyed entries )
+            ]
+        )
 
 
 node : List Attribute -> List ( Key, Markup ) -> Markup
@@ -95,26 +95,26 @@ node attrs entries =
         seed =
             joinSeed attrsSeed entriesSeed
     in
-    ( seed
-    , Encode.object
-        [ ( "hash", Encode.int seed )
-        , ( "attrsHash", Encode.int attrsSeed )
-        , ( "attrs", encodeAttributes attrs )
-        , ( "entriesHash", Encode.int entriesSeed )
-        , ( "entries", encodeEntries entries )
-        , ( "keyed", encodeKeyed entries )
-        ]
-    )
-        |> Markup
+    Markup
+        seed
+        (Encode.object
+            [ ( "hash", Encode.int seed )
+            , ( "attrsHash", Encode.int attrsSeed )
+            , ( "attrs", encodeAttributes attrs )
+            , ( "entriesHash", Encode.int entriesSeed )
+            , ( "entries", encodeEntries entries )
+            , ( "keyed", encodeKeyed entries )
+            ]
+        )
 
 
 text : String -> Markup
 text str =
-    Markup ( FNV1a.hashWithSeed str seedForText, Encode.string str )
+    Markup (FNV1a.hashWithSeed str seedForText) (Encode.string str)
 
 
 isEqual : Markup -> Markup -> Bool
-isEqual (Markup ( a, _ )) (Markup ( b, _ )) =
+isEqual (Markup a _) (Markup b _) =
     a == b
 
 
@@ -149,21 +149,21 @@ seedForKey =
 hashEntries : List ( Key, Markup ) -> Seed
 hashEntries =
     List.foldl
-        (\( Key keySeed _ _, Markup ( valueSeed, _ ) ) -> combineSeed (joinSeed keySeed valueSeed))
+        (\( Key keySeed _ _, Markup valueSeed _ ) -> combineSeed (joinSeed keySeed valueSeed))
         (FNV1a.hash "entries")
 
 
 encodeKeyed : List ( Key, Markup ) -> Value
 encodeKeyed =
     List.map
-        (\( Key _ key_ _, Markup ( _, value ) ) -> ( key_, value ))
+        (\( Key _ key_ _, Markup _ value ) -> ( key_, value ))
         >> Encode.object
 
 
 encodeEntries : List ( Key, Markup ) -> Value
 encodeEntries =
     Encode.list <|
-        \( Key _ _ key_, Markup ( _, value ) ) ->
+        \( Key _ _ key_, Markup _ value ) ->
             Encode.object
                 [ ( "key", key_ )
                 , ( "value", value )
