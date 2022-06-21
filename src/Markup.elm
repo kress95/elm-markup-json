@@ -1,5 +1,5 @@
 module Markup exposing
-    ( Markup, node, tagNode, text, isEqual
+    ( Markup, node, tagNode, text, isEqual, encode
     , Tag, tag
     , Key, key
     , Attribute, at, ev, attribute, event
@@ -10,7 +10,7 @@ module Markup exposing
 
 # Markup
 
-@docs Markup, node, tagNode, text, isEqual
+@docs Markup, node, tagNode, text, isEqual, encode
 @docs Tag, tag
 @docs Key, key
 
@@ -116,6 +116,11 @@ text str =
 isEqual : Markup -> Markup -> Bool
 isEqual (Markup a _) (Markup b _) =
     a == b
+
+
+encode : Markup -> Value
+encode (Markup _ value) =
+    value
 
 
 
