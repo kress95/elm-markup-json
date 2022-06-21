@@ -1,5 +1,5 @@
 module Json.HashEncode exposing
-    ( HashedValue, unwrap, toHash, toValue, isEqual
+    ( HashValue, hash, value, isEqual
     , string, int, float, bool, null
     , list, array, set
     , object, objectWithHash, dict
@@ -10,7 +10,7 @@ module Json.HashEncode exposing
 
 # Encoding
 
-@docs HashedValue, unwrap, toHash, toValue, isEqual
+@docs HashValue, hash, value, isEqual
 
 
 # Primitives
@@ -36,51 +36,51 @@ import Json.Encode as Encode exposing (Value)
 import Set exposing (Set)
 
 
-type HashedValue
-    = HashedValue ( Hash, Value )
+type HashValue
+    = HashValue Seed Value
 
 
-unwrap : HashedValue -> ( Hash, Value )
-unwrap (HashedValue pair) =
-    pair
+type alias Seed =
+    Int
 
 
-toHash : HashedValue -> Hash
-toHash (HashedValue ( hash, _ )) =
-    hash
+hash : HashValue -> Hash
+hash (HashValue seed _) =
+    seed
 
 
-toValue : HashedValue -> Value
-toValue (HashedValue ( _, value )) =
-    value
+value : HashValue -> Value
+value (HashValue _ a) =
+    a
 
 
-isEqual : HashedValue -> HashedValue -> Bool
-isEqual (HashedValue ( a, _ )) (HashedValue ( b, _ )) =
+isEqual : HashValue -> HashValue -> Bool
+isEqual (HashValue a _) (HashValue b _) =
     a == b
 
 
-string : String -> HashedValue
+string : String -> HashValue
 string a =
-    ( Hash.stringWith a stringSeed
-    , Encode.string a
-    )
-        |> HashedValue
+    HashValue
+        (Hash.stringWith a stringSeed)
+        (Encode.string a)
 
 
-int : Int -> HashedValue
+int : Int -> HashValue
 int a =
-    ( Hash.intWith a intSeed, Encode.int a )
-        |> HashedValue
+    HashValue
+        (Hash.intWith a intSeed)
+        (Encode.int a)
 
 
-float : Float -> HashedValue
+float : Float -> HashValue
 float a =
-    ( Hash.floatWith a floatSeed, Encode.float a )
-        |> HashedValue
+    HashValue
+        (Hash.floatWith a floatSeed)
+        (Encode.float a)
 
 
-bool : Bool -> HashedValue
+bool : Bool -> HashValue
 bool a =
     if a then
         true
@@ -89,74 +89,66 @@ bool a =
         false
 
 
-true : HashedValue
+true : HashValue
 true =
-    ( Hash.string "true", Encode.bool True )
-        |> HashedValue
+    HashValue (Hash.string "true") (Encode.bool True)
 
 
-false : HashedValue
+false : HashValue
 false =
-    ( Hash.string "false", Encode.bool False )
-        |> HashedValue
+    HashValue (Hash.string "false") (Encode.bool False)
 
 
-null : HashedValue
+null : HashValue
 null =
-    ( Hash.string "null", Encode.null )
-        |> HashedValue
+    HashValue (Hash.string "null") Encode.null
 
 
-list : (value -> HashedValue) -> List value -> HashedValue
+list : (value -> HashValue) -> List value -> HashValue
 list func entries =
     listHelp arraySeed func entries
 
 
-array : (value -> HashedValue) -> Array value -> HashedValue
+array : (value -> HashValue) -> Array value -> HashValue
 array func entries =
     let
         values =
             Array.map func entries
     in
-    ( Array.foldl hashValue arraySeed values
-    , Encode.array toValue values
-    )
-        |> HashedValue
+    HashValue
+        (Array.foldl hashValue arraySeed values)
+        (Encode.array value values)
 
 
-set : (value -> HashedValue) -> Set value -> HashedValue
+set : (value -> HashValue) -> Set value -> HashValue
 set func entries =
     listHelp arraySeed func (Set.toList entries)
 
 
-object : List ( String, HashedValue ) -> HashedValue
+object : List ( String, HashValue ) -> HashValue
 object pairs =
-    ( List.foldl hashPair objectSeed pairs
-    , Encode.object (List.map toEntry pairs)
-    )
-        |> HashedValue
+    HashValue
+        (List.foldl hashPair objectSeed pairs)
+        (Encode.object (List.map toEntry pairs))
 
 
-objectWithHash : String -> List ( String, HashedValue ) -> HashedValue
+objectWithHash : String -> List ( String, HashValue ) -> HashValue
 objectWithHash key pairs =
     let
         seed =
             List.foldl hashPair objectSeed pairs
     in
-    ( seed
-    , Encode.object (( key, Encode.int seed ) :: List.map toEntry pairs)
-    )
-        |> HashedValue
+    HashValue seed
+        (Encode.object (( key, Encode.int seed ) :: List.map toEntry pairs))
 
 
-dict : (k -> String) -> (v -> HashedValue) -> Dict k v -> HashedValue
+dict : (k -> String) -> (v -> HashValue) -> Dict k v -> HashValue
 dict toKey encode dictionary =
     let
         ( seed, values ) =
             dictHelp toKey encode dictionary
     in
-    ( seed, Encode.dict identity toValue values )
-        |> HashedValue
+    HashValue seed (Encode.dict identity value values)
 
 
 
@@ -188,13 +180,13 @@ objectSeed =
     Hash.string "object"
 
 
-hashValue : HashedValue -> Int -> Int
-hashValue (HashedValue ( seed, _ )) =
+hashValue : HashValue -> Int -> Int
+hashValue (HashValue seed _) =
     Hash.join seed
 
 
-hashPair : ( String, HashedValue ) -> Int -> Int
-hashPair ( key, HashedValue ( valueHash, _ ) ) seed =
+hashPair : ( String, HashValue ) -> Int -> Int
+hashPair ( key, HashValue valueHash _ ) seed =
     let
         keyHash =
             Hash.stringWith key stringSeed
@@ -202,24 +194,23 @@ hashPair ( key, HashedValue ( valueHash, _ ) ) seed =
     Hash.combine (Hash.join keyHash valueHash) seed
 
 
-toEntry : ( String, HashedValue ) -> ( String, Value )
-toEntry ( key, HashedValue ( _, a ) ) =
+toEntry : ( String, HashValue ) -> ( String, Value )
+toEntry ( key, HashValue _ a ) =
     ( key, a )
 
 
-listHelp : Int -> (value -> HashedValue) -> List value -> HashedValue
+listHelp : Int -> (value -> HashValue) -> List value -> HashValue
 listHelp seed func entries =
     let
         values =
             List.map func entries
     in
-    ( List.foldl hashValue seed values
-    , Encode.list toValue values
-    )
-        |> HashedValue
+    HashValue
+        (List.foldl hashValue seed values)
+        (Encode.list value values)
 
 
-dictHelp : (k -> String) -> (v -> HashedValue) -> Dict k v -> ( Int, Dict String HashedValue )
+dictHelp : (k -> String) -> (v -> HashValue) -> Dict k v -> ( Int, Dict String HashValue )
 dictHelp toKey encode =
     Dict.foldl
         (\k v ( seed, dictionary ) ->
@@ -227,7 +218,7 @@ dictHelp toKey encode =
                 key =
                     toKey k
 
-                ((HashedValue ( seed_, _ )) as a) =
+                ((HashValue seed_ _) as a) =
                     encode v
             in
             ( Hash.stringWith key (Hash.combine seed_ seed)
