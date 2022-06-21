@@ -21,10 +21,10 @@ module Markup exposing
 
 -}
 
+import Bitwise as Bit
 import FNV1a
 import Json.Encode as Encode exposing (Value)
 import Json.HashEncode as HashEncode exposing (HashedValue)
-import Markup.Hash as Hash exposing (Hash)
 
 
 
@@ -32,46 +32,50 @@ import Markup.Hash as Hash exposing (Hash)
 
 
 type Markup
-    = Markup ( Hash, Value )
+    = Markup ( Seed, Value )
+
+
+type alias Seed =
+    Int
 
 
 type Tag
-    = Tag Hash Value
+    = Tag Seed Value
 
 
 type Key
-    = Key Hash String Value
+    = Key Seed String Value
 
 
 tag : String -> Tag
 tag str =
-    Tag (FNV1a.hashWithSeed str tagSeed) (Encode.string str)
+    Tag (FNV1a.hashWithSeed str seedForTag) (Encode.string str)
 
 
 key : String -> Key
 key str =
-    Key (FNV1a.hashWithSeed str keySeed) str (Encode.string str)
+    Key (FNV1a.hashWithSeed str seedForKey) str (Encode.string str)
 
 
 tagNode : Tag -> List Attribute -> List ( Key, Markup ) -> Markup
-tagNode (Tag tagHash tagValue) attrs entries =
+tagNode (Tag tagSeed tagValue) attrs entries =
     let
-        attrsHash =
+        attrsSeed =
             hashAttributes attrs
 
-        entriesHash =
+        entriesSeed =
             hashEntries entries
 
-        hash =
-            Hash.join entriesHash (Hash.join attrsHash tagHash)
+        seed =
+            joinSeed entriesSeed (joinSeed attrsSeed tagSeed)
     in
-    ( hash
+    ( seed
     , Encode.object
         [ ( "tag", tagValue )
-        , ( "hash", Encode.int hash )
-        , ( "attrsHash", Encode.int attrsHash )
+        , ( "hash", Encode.int seed )
+        , ( "attrsHash", Encode.int attrsSeed )
         , ( "attrs", encodeAttributes attrs )
-        , ( "entriesHash", Encode.int entriesHash )
+        , ( "entriesHash", Encode.int entriesSeed )
         , ( "entries", encodeEntries entries )
         , ( "keyed", encodeKeyed entries )
         ]
@@ -82,21 +86,21 @@ tagNode (Tag tagHash tagValue) attrs entries =
 node : List Attribute -> List ( Key, Markup ) -> Markup
 node attrs entries =
     let
-        attrsHash =
+        attrsSeed =
             hashAttributes attrs
 
-        entriesHash =
+        entriesSeed =
             hashEntries entries
 
-        hash =
-            Hash.join attrsHash entriesHash
+        seed =
+            joinSeed attrsSeed entriesSeed
     in
-    ( hash
+    ( seed
     , Encode.object
-        [ ( "hash", Encode.int hash )
-        , ( "attrsHash", Encode.int attrsHash )
+        [ ( "hash", Encode.int seed )
+        , ( "attrsHash", Encode.int attrsSeed )
         , ( "attrs", encodeAttributes attrs )
-        , ( "entriesHash", Encode.int entriesHash )
+        , ( "entriesHash", Encode.int entriesSeed )
         , ( "entries", encodeEntries entries )
         , ( "keyed", encodeKeyed entries )
         ]
@@ -106,17 +110,17 @@ node attrs entries =
 
 text : String -> Markup
 text str =
-    Markup ( FNV1a.hashWithSeed str textSeed, Encode.string str )
+    Markup ( FNV1a.hashWithSeed str seedForText, Encode.string str )
 
 
 
 -- Markup internals
 
 
-hashAttributes : List Attribute -> Hash
+hashAttributes : List Attribute -> Seed
 hashAttributes =
     List.foldl
-        (\(Attribute keyHash valueHash _) -> Hash.combine (Hash.join keyHash valueHash))
+        (\(Attribute keySeed valueSeed _) -> combineSeed (joinSeed keySeed valueSeed))
         (FNV1a.hash "attributes")
 
 
@@ -127,42 +131,42 @@ encodeAttributes =
         >> Encode.object
 
 
-tagSeed : Hash
-tagSeed =
+seedForTag : Seed
+seedForTag =
     FNV1a.hash "tag"
 
 
-keySeed : Hash
-keySeed =
+seedForKey : Seed
+seedForKey =
     FNV1a.hash "key"
 
 
-hashEntries : List ( Key, Markup ) -> Hash
+hashEntries : List ( Key, Markup ) -> Seed
 hashEntries =
     List.foldl
-        (\( Key kHash _ _, Markup ( vHash, _ ) ) -> Hash.combine (Hash.join kHash vHash))
+        (\( Key keySeed _ _, Markup ( valueSeed, _ ) ) -> combineSeed (joinSeed keySeed valueSeed))
         (FNV1a.hash "entries")
 
 
 encodeKeyed : List ( Key, Markup ) -> Value
 encodeKeyed =
     List.map
-        (\( Key _ k _, Markup ( _, v ) ) -> ( k, v ))
+        (\( Key _ key_ _, Markup ( _, value ) ) -> ( key_, value ))
         >> Encode.object
 
 
 encodeEntries : List ( Key, Markup ) -> Value
 encodeEntries =
     Encode.list <|
-        \( Key _ _ k, Markup ( _, v ) ) ->
+        \( Key _ _ key_, Markup ( _, value ) ) ->
             Encode.object
-                [ ( "key", k )
-                , ( "value", v )
+                [ ( "key", key_ )
+                , ( "value", value )
                 ]
 
 
-textSeed : Hash
-textSeed =
+seedForText : Seed
+seedForText =
     FNV1a.hash "text"
 
 
@@ -171,80 +175,80 @@ textSeed =
 
 
 type Attribute
-    = Attribute Hash Hash ( String, Value )
+    = Attribute Seed Seed ( String, Value )
 
 
 at : String -> HashedValue -> Attribute
 at str value =
     let
-        valueHash =
+        valueSeed =
             HashEncode.toHash value
     in
     Attribute
-        (FNV1a.hashWithSeed str attributeSeed)
-        valueHash
-        ( str, encodeAttribute valueHash (HashEncode.toValue value) )
+        (FNV1a.hashWithSeed str seedForAttribute)
+        valueSeed
+        ( str, encodeAttribute valueSeed (HashEncode.toValue value) )
 
 
 ev : String -> HashedValue -> Attribute
 ev str value =
     let
-        valueHash =
-            Hash.join (HashEncode.toHash value) eventSeed
+        valueSeed =
+            joinSeed (HashEncode.toHash value) seedForEvent
     in
     Attribute
-        (FNV1a.hashWithSeed str attributeSeed)
-        valueHash
-        ( str, encodeEvent valueHash (HashEncode.toValue value) )
+        (FNV1a.hashWithSeed str seedForAttribute)
+        valueSeed
+        ( str, encodeEvent valueSeed (HashEncode.toValue value) )
 
 
 attribute : String -> HashedValue -> Attribute
 attribute str =
     let
-        keyHash =
-            FNV1a.hashWithSeed str attributeSeed
+        keySeed =
+            FNV1a.hashWithSeed str seedForAttribute
     in
     \value ->
         let
-            valueHash =
+            valueSeed =
                 HashEncode.toHash value
         in
         Attribute
-            keyHash
-            valueHash
-            ( str, encodeAttribute valueHash (HashEncode.toValue value) )
+            keySeed
+            valueSeed
+            ( str, encodeAttribute valueSeed (HashEncode.toValue value) )
 
 
 event : String -> HashedValue -> Attribute
 event str =
     let
-        keyHash =
-            FNV1a.hashWithSeed str attributeSeed
+        keySeed =
+            FNV1a.hashWithSeed str seedForAttribute
     in
     \value ->
         let
-            valueHash =
-                Hash.join (HashEncode.toHash value) eventSeed
+            valueSeed =
+                joinSeed (HashEncode.toHash value) seedForEvent
         in
         Attribute
-            keyHash
-            valueHash
-            ( str, encodeEvent valueHash (HashEncode.toValue value) )
+            keySeed
+            valueSeed
+            ( str, encodeEvent valueSeed (HashEncode.toValue value) )
 
 
 
 -- Attributes internals
 
 
-attributeSeed : Hash
-attributeSeed =
+seedForAttribute : Seed
+seedForAttribute =
     FNV1a.hash "attribute"
 
 
-encodeAttribute : Hash -> Value -> Value
-encodeAttribute hash context =
+encodeAttribute : Seed -> Value -> Value
+encodeAttribute seed context =
     Encode.object
-        [ ( "hash", Encode.int hash )
+        [ ( "hash", Encode.int seed )
         , attributeTag
         , ( "context", context )
         ]
@@ -255,15 +259,15 @@ attributeTag =
     ( "event", Encode.bool False )
 
 
-eventSeed : Hash
-eventSeed =
+seedForEvent : Seed
+seedForEvent =
     FNV1a.hash "event"
 
 
-encodeEvent : Hash -> Value -> Value
-encodeEvent hash context =
+encodeEvent : Seed -> Value -> Value
+encodeEvent seed context =
     Encode.object
-        [ ( "hash", Encode.int hash )
+        [ ( "hash", Encode.int seed )
         , eventTag
         , ( "context", context )
         ]
@@ -272,3 +276,17 @@ encodeEvent hash context =
 eventTag : ( String, Value )
 eventTag =
     ( "event", Encode.bool True )
+
+
+
+--- general internals
+
+
+joinSeed : Seed -> Seed -> Seed
+joinSeed a seed =
+    Bit.xor (a * 16777619) seed
+
+
+combineSeed : Seed -> Seed -> Seed
+combineSeed a seed =
+    Bit.xor a seed * 16777619
