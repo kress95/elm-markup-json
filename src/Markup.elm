@@ -1,5 +1,5 @@
 module Markup exposing
-    ( Markup, node, tagNode, text
+    ( Markup, node, tagNode, text, isEqual
     , Tag, tag
     , Key, key
     , Attribute, at, ev, attribute, event
@@ -10,7 +10,7 @@ module Markup exposing
 
 # Markup
 
-@docs Markup, node, tagNode, text
+@docs Markup, node, tagNode, text, isEqual
 @docs Tag, tag
 @docs Key, key
 
@@ -24,7 +24,7 @@ module Markup exposing
 import Bitwise as Bit
 import FNV1a
 import Json.Encode as Encode exposing (Value)
-import Json.HashEncode as HashEncode exposing (HashedValue)
+import Json.HashEncode as HashEncode exposing (HashValue)
 
 
 
@@ -113,6 +113,11 @@ text str =
     Markup ( FNV1a.hashWithSeed str seedForText, Encode.string str )
 
 
+isEqual : Markup -> Markup -> Bool
+isEqual (Markup ( a, _ )) (Markup ( b, _ )) =
+    a == b
+
+
 
 -- Markup internals
 
@@ -178,7 +183,7 @@ type Attribute
     = Attribute Seed Seed ( String, Value )
 
 
-at : String -> HashedValue -> Attribute
+at : String -> HashValue -> Attribute
 at str value =
     let
         valueSeed =
@@ -187,10 +192,10 @@ at str value =
     Attribute
         (FNV1a.hashWithSeed str seedForAttribute)
         valueSeed
-        ( str, encodeAttribute valueSeed (HashEncode.toValue value) )
+        ( str, encodeAttribute valueSeed (HashEncode.value value) )
 
 
-ev : String -> HashedValue -> Attribute
+ev : String -> HashValue -> Attribute
 ev str value =
     let
         valueSeed =
@@ -199,10 +204,10 @@ ev str value =
     Attribute
         (FNV1a.hashWithSeed str seedForAttribute)
         valueSeed
-        ( str, encodeEvent valueSeed (HashEncode.toValue value) )
+        ( str, encodeEvent valueSeed (HashEncode.value value) )
 
 
-attribute : String -> HashedValue -> Attribute
+attribute : String -> HashValue -> Attribute
 attribute str =
     let
         keySeed =
@@ -216,10 +221,10 @@ attribute str =
         Attribute
             keySeed
             valueSeed
-            ( str, encodeAttribute valueSeed (HashEncode.toValue value) )
+            ( str, encodeAttribute valueSeed (HashEncode.value value) )
 
 
-event : String -> HashedValue -> Attribute
+event : String -> HashValue -> Attribute
 event str =
     let
         keySeed =
@@ -233,7 +238,7 @@ event str =
         Attribute
             keySeed
             valueSeed
-            ( str, encodeEvent valueSeed (HashEncode.toValue value) )
+            ( str, encodeEvent valueSeed (HashEncode.value value) )
 
 
 
