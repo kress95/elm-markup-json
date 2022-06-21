@@ -6,11 +6,12 @@ import Platform
 
 
 type PortsModel model
-    = Model Markup model
+    = Model Markup Bool model
 
 
 type PortsMsg msg
     = Msg msg
+    | AnimationFrame
     | EventError Decode.Error
 
 
@@ -33,6 +34,7 @@ program :
     , subscriptions : model -> Sub msg
     , send : Value -> PortsCmd msg
     , receive : (Value -> PortsMsg msg) -> PortsSub msg
+    , onAnimationFrame : (() -> PortsMsg msg) -> PortsSub msg
     , expect : Decoder msg
     }
     -> Program flags model msg
@@ -65,7 +67,7 @@ initFrom { init, view, send } flags =
         html =
             view model
     in
-    ( Model html model
+    ( Model html True model
     , Cmd.batch
         [ Cmd.map Msg cmd
         , send (Markup.encode html)
@@ -82,46 +84,49 @@ type alias Update a model msg =
 
 
 updateFrom : Update a model msg -> PortsMsg msg -> PortsModel model -> ( PortsModel model, PortsCmd msg )
-updateFrom { update, view, send } msg (Model html model) =
-    let
-        ( model_, cmd ) =
-            case msg of
-                Msg updateMsg ->
+updateFrom { update, view, send } msg (Model html dirty model) =
+    case msg of
+        Msg updateMsg ->
+            let
+                ( model_, cmd ) =
                     update updateMsg model
+            in
+            ( Model html True model_, Cmd.map Msg cmd )
 
-                EventError _ ->
-                    -- TODO: create error page
-                    ( model, Cmd.none )
+        AnimationFrame ->
+            if dirty then
+                let
+                    html_ =
+                        view model
+                in
+                if Markup.isEqual html html_ then
+                    ( Model html False model, Cmd.none )
 
-        -- TODO only update on request animation frame
-        html_ =
-            view model_
-    in
-    ( Model html_ model_
-    , if Markup.isEqual html html_ then
-        Cmd.map Msg cmd
+                else
+                    ( Model html_ False model, send (Markup.encode html_) )
 
-      else
-        Cmd.batch
-            [ Cmd.map Msg cmd
-            , send (Markup.encode html_)
-            ]
-    )
+            else
+                ( Model html False model, Cmd.none )
+
+        EventError _ ->
+            ( Model html False model, Cmd.none )
 
 
 type alias Subscriptions a model msg =
     { a
         | subscriptions : model -> Sub msg
         , receive : (Value -> PortsMsg msg) -> PortsSub msg
+        , onAnimationFrame : (() -> PortsMsg msg) -> PortsSub msg
         , expect : Decoder msg
     }
 
 
 subscriptionsFrom : Subscriptions a model msg -> PortsModel model -> PortsSub msg
-subscriptionsFrom { subscriptions, receive, expect } (Model _ model) =
+subscriptionsFrom { subscriptions, receive, expect, onAnimationFrame } (Model _ _ model) =
     Sub.batch
         [ Sub.map Msg (subscriptions model)
         , receive (subscriptionsDecode expect)
+        , onAnimationFrame (always AnimationFrame)
         ]
 
 

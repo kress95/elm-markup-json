@@ -1,9 +1,9 @@
 port module Main exposing (main)
 
 import Json.Decode as Decode exposing (Value)
-import Process
-import Markup.Program exposing (Program, program)
 import Markup.Html as Html exposing (Html)
+import Markup.Program exposing (Program, program)
+import Process
 import Task
 
 
@@ -25,6 +25,7 @@ main =
         , subscriptions = subscriptions
         , send = toHost
         , receive = fromHost
+        , onAnimationFrame = onAnimationFrame
         , expect = Decode.succeed None
         }
 
@@ -97,3 +98,6 @@ port toHost : Value -> Cmd msg
 
 
 port fromHost : (Value -> msg) -> Sub msg
+
+
+port onAnimationFrame : (() -> msg) -> Sub msg
