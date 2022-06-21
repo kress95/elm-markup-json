@@ -1,6 +1,6 @@
 module Json.HashEncode exposing
     ( HashValue, hash, value, isEqual
-    , string, int, float, bool, null
+    , string, int, int32, int52, float, float64, bool, null
     , list, array, set
     , object, objectWithHash, dict
     )
@@ -15,7 +15,7 @@ module Json.HashEncode exposing
 
 # Primitives
 
-@docs string, int, float, bool, null
+@docs string, int, int32, int52, float, float64, bool, null
 
 
 # Arrays
@@ -30,8 +30,9 @@ module Json.HashEncode exposing
 -}
 
 import Array exposing (Array)
+import Bitwise as Bit
 import Dict exposing (Dict)
-import Hash as Hash exposing (Hash)
+import FNV1a
 import Json.Encode as Encode exposing (Value)
 import Set exposing (Set)
 
@@ -44,7 +45,7 @@ type alias Seed =
     Int
 
 
-hash : HashValue -> Hash
+hash : HashValue -> Seed
 hash (HashValue seed _) =
     seed
 
@@ -61,22 +62,37 @@ isEqual (HashValue a _) (HashValue b _) =
 
 string : String -> HashValue
 string a =
-    HashValue
-        (Hash.stringWith a stringSeed)
+    HashValue (FNV1a.hashWithSeed a stringSeed)
         (Encode.string a)
 
 
 int : Int -> HashValue
 int a =
-    HashValue
-        (Hash.intWith a intSeed)
+    HashValue (hashIntWithSeed a intSeed)
+        (Encode.int a)
+
+
+int32 : Int -> HashValue
+int32 a =
+    HashValue (hashInt32WithSeed a intSeed)
+        (Encode.int a)
+
+
+int52 : Int -> HashValue
+int52 a =
+    HashValue (FNV1a.hashWithSeed (String.fromInt a) intSeed)
         (Encode.int a)
 
 
 float : Float -> HashValue
 float a =
-    HashValue
-        (Hash.floatWith a floatSeed)
+    HashValue (hashFloatWithSeed a floatSeed)
+        (Encode.float a)
+
+
+float64 : Float -> HashValue
+float64 a =
+    HashValue (FNV1a.hashWithSeed (String.fromFloat a) floatSeed)
         (Encode.float a)
 
 
@@ -91,17 +107,17 @@ bool a =
 
 true : HashValue
 true =
-    HashValue (Hash.string "true") (Encode.bool True)
+    HashValue (FNV1a.hash "true") (Encode.bool True)
 
 
 false : HashValue
 false =
-    HashValue (Hash.string "false") (Encode.bool False)
+    HashValue (FNV1a.hash "false") (Encode.bool False)
 
 
 null : HashValue
 null =
-    HashValue (Hash.string "null") Encode.null
+    HashValue (FNV1a.hash "null") Encode.null
 
 
 list : (value -> HashValue) -> List value -> HashValue
@@ -115,8 +131,7 @@ array func entries =
         values =
             Array.map func entries
     in
-    HashValue
-        (Array.foldl hashValue arraySeed values)
+    HashValue (Array.foldl hashValue arraySeed values)
         (Encode.array value values)
 
 
@@ -127,8 +142,7 @@ set func entries =
 
 object : List ( String, HashValue ) -> HashValue
 object pairs =
-    HashValue
-        (List.foldl hashPair objectSeed pairs)
+    HashValue (List.foldl hashPair objectSeed pairs)
         (Encode.object (List.map toEntry pairs))
 
 
@@ -157,41 +171,41 @@ dict toKey encode dictionary =
 
 stringSeed : Int
 stringSeed =
-    Hash.string "string"
+    FNV1a.hash "string"
 
 
 intSeed : Int
 intSeed =
-    Hash.string "int"
+    FNV1a.hash "int"
 
 
 floatSeed : Int
 floatSeed =
-    Hash.string "float"
+    FNV1a.hash "float"
 
 
 arraySeed : Int
 arraySeed =
-    Hash.string "array"
+    FNV1a.hash "array"
 
 
 objectSeed : Int
 objectSeed =
-    Hash.string "object"
+    FNV1a.hash "object"
 
 
 hashValue : HashValue -> Int -> Int
 hashValue (HashValue seed _) =
-    Hash.join seed
+    joinSeed seed
 
 
 hashPair : ( String, HashValue ) -> Int -> Int
 hashPair ( key, HashValue valueHash _ ) seed =
     let
         keyHash =
-            Hash.stringWith key stringSeed
+            FNV1a.hashWithSeed key stringSeed
     in
-    Hash.combine (Hash.join keyHash valueHash) seed
+    combineSeed (joinSeed keyHash valueHash) seed
 
 
 toEntry : ( String, HashValue ) -> ( String, Value )
@@ -205,8 +219,7 @@ listHelp seed func entries =
         values =
             List.map func entries
     in
-    HashValue
-        (List.foldl hashValue seed values)
+    HashValue (List.foldl hashValue seed values)
         (Encode.list value values)
 
 
@@ -221,8 +234,71 @@ dictHelp toKey encode =
                 ((HashValue seed_ _) as a) =
                     encode v
             in
-            ( Hash.stringWith key (Hash.combine seed_ seed)
+            ( FNV1a.hashWithSeed key (combineSeed seed_ seed)
             , Dict.insert key a dictionary
             )
         )
         ( objectSeed, Dict.empty )
+
+
+joinSeed : Seed -> Seed -> Seed
+joinSeed a seed =
+    Bit.xor (a * 16777619) seed
+
+
+combineSeed : Seed -> Seed -> Seed
+combineSeed a seed =
+    Bit.xor a seed * 16777619
+
+
+hashInt32WithSeed : Int -> Seed -> Seed
+hashInt32WithSeed a seed =
+    hasher (Bit.and a 0xFF) seed
+        |> hasher (Bit.and (Bit.shiftRightBy a 8) 0xFF)
+        |> hasher (Bit.and (Bit.shiftRightBy a 16) 0xFF)
+        |> hasher (Bit.and (Bit.shiftRightBy a 24) 0xFF)
+
+
+hashIntWithSeed : Int -> Seed -> Seed
+hashIntWithSeed a seed =
+    let
+        x =
+            abs (a + 4503599627370496)
+
+        y =
+            x // 2 ^ 32
+    in
+    hasher (shiftRightZfBy24 y) seed
+        |> hasher (shiftRightZfBy24 (Bit.shiftLeftBy y 8))
+        |> hasher (shiftRightZfBy24 (Bit.shiftLeftBy y 16))
+        |> hasher (shiftRightZfBy24 (Bit.shiftLeftBy y 24))
+        |> hasher (shiftRightZfBy24 x)
+        |> hasher (shiftRightZfBy24 (Bit.shiftLeftBy x 8))
+        |> hasher (shiftRightZfBy24 (Bit.shiftLeftBy x 16))
+        |> hasher (shiftRightZfBy24 (Bit.shiftLeftBy x 24))
+
+
+hashFloatWithSeed : Float -> Seed -> Seed
+hashFloatWithSeed a seed =
+    hashInt32WithSeed (round (a ^ 100000)) seed
+
+
+shiftRightZfBy24 : Int -> Int
+shiftRightZfBy24 x =
+    Bit.shiftRightZfBy x 24
+
+
+hasher : Int -> Int -> Int
+hasher byte seed =
+    -- copied from: https://github.com/robinheghan/fnv1a
+    -- (implementation ported from: https://gist.github.com/vaiorabbit/5657561)
+    let
+        mixed =
+            Bit.xor byte seed
+    in
+    mixed
+        + Bit.shiftLeftBy 1 mixed
+        + Bit.shiftLeftBy 4 mixed
+        + Bit.shiftLeftBy 7 mixed
+        + Bit.shiftLeftBy 8 mixed
+        + Bit.shiftLeftBy 24 mixed
