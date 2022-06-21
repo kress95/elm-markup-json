@@ -1,4 +1,4 @@
-module Markup exposing (..)
+module Markup exposing (Attribute, Key, Markup, Tag, key, node, tag, tagNode, text)
 
 import FNV1a
 import Json.Encode as Encode exposing (Value)
@@ -11,6 +11,7 @@ import Markup.Hash as Hash exposing (Hash)
 
 type Attribute
     = Attribute Hash Hash ( String, Value )
+
 
 
 -- Attributes internals
@@ -46,8 +47,18 @@ type Key
     = Key Hash String Value
 
 
-tag : Tag -> List Attribute -> List ( Key, Markup ) -> Markup
-tag (Tag tagHash tagValue) attrs entries =
+tag : String -> Tag
+tag str =
+    Tag (FNV1a.hashWithSeed str tagSeed) (Encode.string str)
+
+
+key : String -> Key
+key str =
+    Key (FNV1a.hashWithSeed str keySeed) str (Encode.string str)
+
+
+tagNode : Tag -> List Attribute -> List ( Key, Markup ) -> Markup
+tagNode (Tag tagHash tagValue) attrs entries =
     let
         attrsHash =
             hashAttributes attrs
@@ -106,30 +117,40 @@ text str =
 -- Markup internals
 
 
-hashEntries : List ( Key, Markup ) -> Int
+tagSeed : Hash
+tagSeed =
+    FNV1a.hash "tag"
+
+
+keySeed : Hash
+keySeed =
+    FNV1a.hash "key"
+
+
+hashEntries : List ( Key, Markup ) -> Hash
 hashEntries =
     List.foldl
-        (\( Key keyHash _ _, Markup ( value, _ ) ) -> Hash.combine (Hash.join keyHash value))
+        (\( Key kHash _ _, Markup ( vHash, _ ) ) -> Hash.combine (Hash.join kHash vHash))
         (FNV1a.hash "entries")
 
 
 encodeCache : List ( Key, Markup ) -> Value
 encodeCache =
     List.map
-        (\( Key _ key _, Markup ( _, value ) ) -> ( key, value ))
+        (\( Key _ k _, Markup ( _, v ) ) -> ( k, v ))
         >> Encode.object
 
 
 encodeEntries : List ( Key, Markup ) -> Value
 encodeEntries =
     Encode.list <|
-        \( Key _ _ keyValue, Markup ( _, value ) ) ->
+        \( Key _ _ k, Markup ( _, v ) ) ->
             Encode.object
-                [ ( "key", keyValue )
-                , ( "value", value )
+                [ ( "key", k )
+                , ( "value", v )
                 ]
 
 
-textSeed : Int
+textSeed : Hash
 textSeed =
     FNV1a.hash "text"
