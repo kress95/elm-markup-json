@@ -78,7 +78,6 @@ tagNode (Tag tagSeed tagValue) attrs entries =
             , ( "attrs", encodeAttributes attrs )
             , ( "entriesHash", Encode.int entriesSeed )
             , ( "entries", encodeEntries entries )
-            , ( "keyed", encodeKeyed entries )
             ]
         )
 
@@ -103,7 +102,6 @@ node attrs entries =
             , ( "attrs", encodeAttributes attrs )
             , ( "entriesHash", Encode.int entriesSeed )
             , ( "entries", encodeEntries entries )
-            , ( "keyed", encodeKeyed entries )
             ]
         )
 
@@ -166,13 +164,6 @@ encodeEntries =
                 [ ( "key", key_ )
                 , ( "value", value )
                 ]
-
-
-encodeKeyed : List ( Key, Markup ) -> Value
-encodeKeyed =
-    List.map
-        (\( Key _ key_ _, Markup _ value ) -> ( key_, value ))
-        >> Encode.object
 
 
 seedForText : Seed

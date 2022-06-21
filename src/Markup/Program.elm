@@ -1,30 +1,37 @@
-module Markup.Program exposing (PortsCmd, PortsMsg, PortsSub, Program, program)
+module Markup.Program exposing (MarkupCmd, MarkupSub, Msg, Program, program)
 
 import Json.Decode as Decode exposing (Decoder, Value)
+import Json.Encode as Encode
 import Markup exposing (Markup)
 import Platform
 
 
-type PortsModel model
-    = Model Markup Bool model
+type State model
+    = State (Internal model)
 
 
-type PortsMsg msg
+type alias Internal model =
+    { model : model
+    , dirty : Bool
+    , markup : Markup
+    }
+
+
+type Msg msg
     = Msg msg
     | AnimationFrame
-    | EventError Decode.Error
 
 
-type alias PortsCmd msg =
-    Cmd (PortsMsg msg)
+type alias MarkupCmd msg =
+    Cmd (Msg msg)
 
 
-type alias PortsSub msg =
-    Sub (PortsMsg msg)
+type alias MarkupSub msg =
+    Sub (Msg msg)
 
 
 type alias Program flags model msg =
-    Platform.Program flags (PortsModel model) (PortsMsg msg)
+    Platform.Program flags (State model) (Msg msg)
 
 
 program :
@@ -32,17 +39,85 @@ program :
     , view : model -> Markup
     , update : msg -> model -> ( model, Cmd msg )
     , subscriptions : model -> Sub msg
-    , send : Value -> PortsCmd msg
-    , receive : (Value -> PortsMsg msg) -> PortsSub msg
-    , onAnimationFrame : (() -> PortsMsg msg) -> PortsSub msg
+    , send : Value -> MarkupCmd msg
+    , receive : (Value -> Msg msg) -> MarkupSub msg
     , expect : Decoder msg
+    , onError : Decode.Error -> msg
     }
     -> Program flags model msg
 program config =
+    let
+        { init, view, update, subscriptions, send, receive, expect, onError } =
+            config
+
+        sendMarkup =
+            Markup.encode >> send
+
+        requestAnimationFrame =
+            send Encode.null
+
+        init_ flags =
+            let
+                ( model, cmd ) =
+                    init flags
+
+                markup =
+                    view model
+            in
+            ( State { model = model, dirty = False, markup = markup }
+            , Cmd.batch
+                [ Cmd.map Msg cmd
+                , sendMarkup markup
+                ]
+            )
+
+        update_ msg (State ({ model, dirty } as state)) =
+            case msg of
+                Msg updateMsg ->
+                    let
+                        ( model_, cmd ) =
+                            update updateMsg model
+
+                        state_ =
+                            State { state | model = model_, dirty = True }
+                    in
+                    if dirty then
+                        ( state_
+                        , Cmd.map Msg cmd
+                        )
+
+                    else
+                        ( state_
+                        , Cmd.batch
+                            [ Cmd.map Msg cmd
+                            , requestAnimationFrame
+                            ]
+                        )
+
+                AnimationFrame ->
+                    let
+                        markup =
+                            view model
+
+                        state_ =
+                            State { state | markup = markup, dirty = False }
+                    in
+                    if Markup.isEqual state.markup markup then
+                        ( state_, Cmd.none )
+
+                    else
+                        ( state_, sendMarkup markup )
+
+        subscriptions_ (State { model }) =
+            Sub.batch
+                [ Sub.map Msg (subscriptions model)
+                , receive (decode expect onError)
+                ]
+    in
     Platform.worker
-        { init = initFrom config
-        , update = updateFrom config
-        , subscriptions = subscriptionsFrom config
+        { init = init_
+        , update = update_
+        , subscriptions = subscriptions_
         }
 
 
@@ -50,91 +125,19 @@ program config =
 -- internals
 
 
-type alias Init a flags model msg =
-    { a
-        | init : flags -> ( model, Cmd msg )
-        , view : model -> Markup
-        , send : Value -> PortsCmd msg
-    }
-
-
-initFrom : Init a flags model msg -> flags -> ( PortsModel model, PortsCmd msg )
-initFrom { init, view, send } flags =
-    let
-        ( model, cmd ) =
-            init flags
-
-        html =
-            view model
-    in
-    ( Model html True model
-    , Cmd.batch
-        [ Cmd.map Msg cmd
-        , send (Markup.encode html)
-        ]
-    )
-
-
-type alias Update a model msg =
-    { a
-        | update : msg -> model -> ( model, Cmd msg )
-        , view : model -> Markup
-        , send : Value -> PortsCmd msg
-    }
-
-
-updateFrom : Update a model msg -> PortsMsg msg -> PortsModel model -> ( PortsModel model, PortsCmd msg )
-updateFrom { update, view, send } msg (Model html dirty model) =
-    case msg of
-        Msg updateMsg ->
-            let
-                ( model_, cmd ) =
-                    update updateMsg model
-            in
-            ( Model html True model_, Cmd.map Msg cmd )
-
-        AnimationFrame ->
-            if dirty then
-                let
-                    html_ =
-                        view model
-                in
-                if Markup.isEqual html html_ then
-                    ( Model html False model, Cmd.none )
-
-                else
-                    ( Model html_ False model, send (Markup.encode html_) )
-
-            else
-                ( Model html False model, Cmd.none )
-
-        EventError _ ->
-            ( Model html False model, Cmd.none )
-
-
-type alias Subscriptions a model msg =
-    { a
-        | subscriptions : model -> Sub msg
-        , receive : (Value -> PortsMsg msg) -> PortsSub msg
-        , onAnimationFrame : (() -> PortsMsg msg) -> PortsSub msg
-        , expect : Decoder msg
-    }
-
-
-subscriptionsFrom : Subscriptions a model msg -> PortsModel model -> PortsSub msg
-subscriptionsFrom { subscriptions, receive, expect, onAnimationFrame } (Model _ _ model) =
-    Sub.batch
-        [ Sub.map Msg (subscriptions model)
-        , receive (subscriptionsDecode expect)
-        , onAnimationFrame (always AnimationFrame)
-        ]
-
-
-subscriptionsDecode : Decoder msg -> Value -> PortsMsg msg
-subscriptionsDecode expect value =
-    case Decode.decodeValue expect value of
+decode : Decoder msg -> (Decode.Error -> msg) -> Value -> Msg msg
+decode expect onError value =
+    case Decode.decodeValue (decoder expect) value of
         Ok msg ->
-            Msg msg
+            msg
 
         Err message ->
-            EventError message
+            Msg (onError message)
+
+
+decoder : Decoder msg -> Decoder (Msg msg)
+decoder expect =
+    Decode.oneOf
+        [ Decode.null AnimationFrame
+        , Decode.map Msg expect
+        ]

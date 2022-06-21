@@ -9,7 +9,6 @@ export interface Node {
   attrs: Attributes;
   entriesHash: number;
   entries: Entries;
-  keyed: Keyed;
 }
 
 export type Attributes = Record<string, Attribute>;
@@ -36,27 +35,22 @@ export interface Event {
   value: unknown;
 }
 
-export interface SendAnimationFramePort {
-  send(_: null): void;
+export interface Send {
+  (msg: null | Event): void;
 }
 
-export interface SendEvent {
-  (msg: Event): void;
+export interface ToElmPort {
+  send: Send;
 }
 
-export interface SendEventPort {
-  send: SendEvent;
-}
-
-export interface ReceiveMarkupPort {
-  subscribe(handler: (markup: Markup) => void): void;
-  unsubscribe(handler: (markup: Markup) => void): void;
+export interface FromElmPort {
+  subscribe(handler: (markup: Markup | null) => void): void;
+  unsubscribe(handler: (markup: Markup | null) => void): void;
 }
 
 export interface Props {
-  sendAnimationFramePort: SendAnimationFramePort;
-  sendEventPort: SendEventPort;
-  receiveMarkupPort: ReceiveMarkupPort;
+  toElmPort: ToElmPort;
+  fromElmPort: FromElmPort;
 }
 
 interface State {
@@ -71,26 +65,28 @@ export class Renderer extends React.Component<Props, State> {
     this.state = { html: "" };
   }
 
-  handleHtml = (html: Markup) => {
-    this.setState({ html });
+  handleHtml = (html: null | Markup) => {
+    if (html === null) {
+      this.animationFrameRequest = requestAnimationFrame(this.handleAnimationFrame);
+    } else {
+      this.setState({ html });
+    }
   };
 
   handleAnimationFrame = () => {
-    this.props.sendAnimationFramePort.send(null);
-    this.animationFrameRequest = requestAnimationFrame(this.handleAnimationFrame);
+    this.props.toElmPort.send(null);
+    this.animationFrameRequest = null;
   };
 
   componentDidMount() {
-    this.props.receiveMarkupPort.subscribe(this.handleHtml);
-    this.animationFrameRequest = requestAnimationFrame(this.handleAnimationFrame);
+    this.props.fromElmPort.subscribe(this.handleHtml);
   }
 
   componentWillUnmount() {
-    this.props.receiveMarkupPort.unsubscribe(this.handleHtml);
-    const { animationFrameRequest } = this;
-    if (animationFrameRequest !== null) {
+    this.props.fromElmPort.unsubscribe(this.handleHtml);
+    if (this.animationFrameRequest !== null) {
+      cancelAnimationFrame(this.animationFrameRequest);
       this.animationFrameRequest = null;
-      cancelAnimationFrame(animationFrameRequest);
     }
   }
 
@@ -106,7 +102,7 @@ export class Renderer extends React.Component<Props, State> {
     if (typeof html === "string") return html;
     return React.createElement(NodeRenderer, {
       node: html,
-      send: this.props.sendEventPort.send,
+      send: this.props.toElmPort.send,
     });
   }
 }
@@ -116,28 +112,25 @@ export class Renderer extends React.Component<Props, State> {
 interface NodeRendererProps {
   key?: Key | undefined;
   node: Node;
-  send: SendEvent;
+  send: Send;
 }
 
 type NodeProps = Record<string, unknown>;
 type NodeChildren = Array<string | NodeChild>;
 type NodeChild = React.CElement<NodeRendererProps, NodeRenderer>;
-type NodeCache = Record<Key, NodeChild>;
 
 interface NodeRendererState {
   node: Node;
   props: NodeProps;
-  children: NodeChildren;
-  cache: NodeCache;
 }
 
-function getEventHandler(context: unknown, send: SendEvent) {
+function getEventHandler(context: unknown, send: Send) {
   return (value: unknown) => send({ context, value });
 }
 
 function getDerivedProps(
   attrs: Attributes,
-  send: SendEvent,
+  send: Send,
   key: Key | undefined,
   pastAttrs: Attributes,
   pastProps: NodeProps
@@ -159,44 +152,14 @@ function getDerivedProps(
   return props;
 }
 
-function getDerivedChildren(
-  entries: Entries,
-  cache: NodeCache,
-  send: SendEvent,
-  pastKeyed: Keyed,
-  pastCache: NodeCache
-): NodeChildren {
-  return entries.map((entry) => {
-    const { value: node } = entry;
-    if (typeof node === "string") return node;
-    const { key } = entry;
-    const pastValue = pastKeyed[key];
-    if (node.hash === pastValue.hash) return pastCache[key];
-    return (cache[key] = React.createElement(NodeRenderer, {
-      key,
-      node,
-      send,
-    }));
-  });
-}
-
 class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState> {
   constructor(config: NodeRendererProps) {
     super(config);
-
-    const { node, key, send } = config;
-
-    const cache = {};
-
-    this.state = {
-      node,
-      props: this.initializeProps(node.attrs, send, key),
-      children: this.initializeChildren(node.entries, cache, send),
-      cache,
-    };
+    const { node, send, key } = config;
+    this.state = { node, props: this.initializeProps(node.attrs, send, key) };
   }
 
-  initializeProps(attributes: Attributes, send: SendEvent, key?: Key) {
+  initializeProps(attributes: Attributes, send: Send, key?: Key) {
     const props: NodeProps = key === undefined ? {} : { key };
     for (const name in attributes) {
       const attr = attributes[name];
@@ -209,16 +172,16 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
     return props;
   }
 
-  initializeChildren(entries: Entries, cache: NodeCache, send: SendEvent) {
+  initializeChildren(entries: Entries, send: Send): NodeChildren {
     return entries.map((entry) => {
       const { value: node } = entry;
       if (typeof node === "string") return node;
       const { key } = entry;
-      return (cache[key] = React.createElement(NodeRenderer, {
+      return React.createElement(NodeRenderer, {
         key,
         node,
         send,
-      }));
+      });
     });
   }
 
@@ -228,7 +191,6 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
   ) {
     const { node: pastNode } = state;
     if (pastNode.hash === node.hash) return state;
-    const cache: NodeCache = {};
     return {
       node,
       send,
@@ -236,11 +198,6 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
         pastNode.attrsHash === node.attrsHash
           ? state.props
           : getDerivedProps(node.attrs, send, key, pastNode.attrs, state.props),
-      children:
-        pastNode.entriesHash === node.entriesHash
-          ? state.children
-          : getDerivedChildren(node.entries, cache, send, pastNode.keyed, state.cache),
-      cache,
     };
   }
 
@@ -250,10 +207,13 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
 
   render() {
     const {
-      node: { tag },
+      node: { tag, entries },
       props,
-      children,
     } = this.state;
-    return React.createElement(tag ?? "g", props, children);
+    return React.createElement(
+      tag ?? "g",
+      props,
+      this.initializeChildren(entries, this.props.send)
+    );
   }
 }

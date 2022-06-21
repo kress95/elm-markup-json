@@ -25,8 +25,8 @@ main =
         , subscriptions = subscriptions
         , send = toHost
         , receive = fromHost
-        , onAnimationFrame = onAnimationFrame
         , expect = Decode.succeed None
+        , onError = always None
         }
 
 
@@ -99,5 +99,3 @@ port toHost : Value -> Cmd msg
 
 port fromHost : (Value -> msg) -> Sub msg
 
-
-port onAnimationFrame : (() -> msg) -> Sub msg
