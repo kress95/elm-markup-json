@@ -187,7 +187,7 @@ at : String -> HashValue -> Attribute
 at str value =
     let
         valueSeed =
-            HashEncode.toHash value
+            HashEncode.hash value
     in
     Attribute
         (FNV1a.hashWithSeed str seedForAttribute)
@@ -199,7 +199,7 @@ ev : String -> HashValue -> Attribute
 ev str value =
     let
         valueSeed =
-            joinSeed (HashEncode.toHash value) seedForEvent
+            joinSeed (HashEncode.hash value) seedForEvent
     in
     Attribute
         (FNV1a.hashWithSeed str seedForAttribute)
@@ -216,7 +216,7 @@ attribute str =
     \value ->
         let
             valueSeed =
-                HashEncode.toHash value
+                HashEncode.hash value
         in
         Attribute
             keySeed
@@ -233,7 +233,7 @@ event str =
     \value ->
         let
             valueSeed =
-                joinSeed (HashEncode.toHash value) seedForEvent
+                joinSeed (HashEncode.hash value) seedForEvent
         in
         Attribute
             keySeed
