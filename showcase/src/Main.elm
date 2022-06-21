@@ -23,8 +23,8 @@ main =
         , view = view
         , update = update
         , subscriptions = subscriptions
-        , send = html
-        , receive = event
+        , send = toHost
+        , receive = fromHost
         , expect = Decode.succeed None
         }
 
@@ -46,35 +46,35 @@ update msg model =
 
 view : Model -> Html
 view model =
-    Html.div
-        [ Html.p
+    Html.div []
+        [ Html.p []
             [ Html.text "Abc"
             , Html.text "def"
             , Html.text "hij"
-            , Html.p
+            , Html.p []
                 [ Html.text "Abc"
                 , Html.text "def"
                 , Html.text "hij"
-                , Html.p
+                , Html.p []
                     [ Html.text "Abc"
                     , Html.text "def"
                     , Html.text "hij"
                     ]
                 ]
             ]
-        , Html.p
+        , Html.p []
             [ Html.text "Abc"
             , Html.text "def"
             , Html.text "hij"
             ]
-        , Html.p
+        , Html.p []
             [ Html.text (String.fromInt model.seconds)
             ]
-        , Html.p
+        , Html.p []
             [ Html.text "Abc"
             , Html.text "def"
             , Html.text "hij"
-            , Html.p
+            , Html.p []
                 [ Html.text "Abc"
                 , Html.text "def"
                 , Html.text "hij"
@@ -93,7 +93,7 @@ delay time msg =
     Task.perform (always msg) (Process.sleep time)
 
 
-port html : Value -> Cmd msg
+port toHost : Value -> Cmd msg
 
 
-port event : (Value -> msg) -> Sub msg
+port fromHost : (Value -> msg) -> Sub msg
