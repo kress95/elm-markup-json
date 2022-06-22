@@ -28,8 +28,6 @@ export interface Entry {
   value: Node;
 }
 
-export type Keyed = Record<string, Node>;
-
 export interface Event {
   context: unknown;
   value: unknown;
