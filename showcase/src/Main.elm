@@ -2,13 +2,17 @@ port module Main exposing (main)
 
 import Json.Decode as Decode exposing (Value)
 import Markup.Html as Html exposing (Html)
+import Markup.Html.Lazy as Lazy exposing (Memo)
 import Markup.Program exposing (Program, program)
 import Process
 import Task
 
 
 type alias Model =
-    { seconds : Int }
+    { frames : Int
+    , halves : Memo Int
+    , seconds : Memo Html
+    }
 
 
 type Msg
@@ -31,8 +35,13 @@ main =
 
 
 init : {} -> ( Model, Cmd Msg )
-init flags =
-    ( { seconds = 0 }, delay 16 Interval )
+init _ =
+    ( { frames = 0
+      , halves = Lazy.init viewHalves 0
+      , seconds = Lazy.init someCrazyContainer (viewSeconds 0)
+      }
+    , delay 16 Interval
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -42,50 +51,53 @@ update msg model =
             ( model, Cmd.none )
 
         Interval ->
-            ( { seconds = model.seconds + 1 }, delay 16 Interval )
+            let
+                frames =
+                    model.frames + 1
+            in
+            ( { frames = frames
+              , halves = Lazy.memo viewHalves (frames // 30) model.halves
+              , seconds = Lazy.memoWith Html.isEqual someCrazyContainer (viewSeconds (frames // 60)) model.seconds
+              }
+            , delay 16 Interval
+            )
 
 
 view : Model -> Html
 view model =
     Html.div []
-        [ Html.p []
-            [ Html.text "Abc"
-            , Html.text "def"
-            , Html.text "hij"
-            , Html.p []
-                [ Html.text "Abc"
-                , Html.text "def"
-                , Html.text "hij"
-                , Html.p []
-                    [ Html.text "Abc"
-                    , Html.text "def"
-                    , Html.text "hij"
-                    ]
-                ]
+        [ Html.div []
+            [ Html.p [] [ Html.text "frames" ]
+            , Html.p [] [ Html.text (String.fromInt model.frames) ]
             ]
-        , Html.p []
-            [ Html.text "Abc"
-            , Html.text "def"
-            , Html.text "hij"
+        , Html.div []
+            [ Html.p [] [ Html.text "half seconds (memo)" ]
+            , Html.p [] [ Lazy.lazy model.halves ]
             ]
-        , Html.p []
-            [ Html.text (String.fromInt model.seconds)
-            ]
-        , Html.p []
-            [ Html.text "Abc"
-            , Html.text "def"
-            , Html.text "hij"
-            , Html.p []
-                [ Html.text "Abc"
-                , Html.text "def"
-                , Html.text "hij"
-                ]
+        , Html.div []
+            [ Html.p [] [ Html.text "seconds (memoWith)" ]
+            , Html.p [] [ Lazy.lazy model.seconds ]
             ]
         ]
 
 
+viewHalves : Int -> Html
+viewHalves halves =
+    Html.text (String.fromInt halves)
+
+
+viewSeconds : Int -> Html
+viewSeconds seconds =
+    Html.text (String.fromInt seconds)
+
+
+someCrazyContainer : Html -> Html
+someCrazyContainer =
+    List.singleton >> Html.div []
+
+
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.none
 
 
@@ -98,4 +110,3 @@ port toHost : Value -> Cmd msg
 
 
 port fromHost : (Value -> msg) -> Sub msg
-
