@@ -2,7 +2,7 @@ module Markup.Program exposing (MarkupCmd, MarkupSub, Msg, Program, program)
 
 import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
-import Markup exposing (Markup)
+import Markup exposing (Markup, Seed)
 import Platform
 
 
@@ -13,7 +13,7 @@ type State model
 type alias Internal model =
     { model : model
     , dirty : Bool
-    , markup : Markup
+    , hash : Seed
     }
 
 
@@ -64,7 +64,7 @@ program config =
                 markup =
                     view model
             in
-            ( State { model = model, dirty = False, markup = markup }
+            ( State { model = model, dirty = False, hash = Markup.hash markup }
             , Cmd.batch
                 [ Cmd.map Msg cmd
                 , sendMarkup markup
@@ -99,10 +99,13 @@ program config =
                         markup =
                             view model
 
+                        hash =
+                            Markup.hash markup
+
                         state_ =
-                            State { state | markup = markup, dirty = False }
+                            State { state | hash = hash, dirty = False }
                     in
-                    if Markup.isEqual state.markup markup then
+                    if hash == state.hash then
                         ( state_, Cmd.none )
 
                     else
