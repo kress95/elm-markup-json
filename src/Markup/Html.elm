@@ -1,5 +1,5 @@
 module Markup.Html exposing
-    ( Html, Tag, Key, text, div, p, custom, encode
+    ( Html, Tag, Key, text, div, p, custom, isEqual, encode
     , Attribute, attribute, event
     )
 
@@ -8,7 +8,7 @@ module Markup.Html exposing
 
 # Html
 
-@docs Html, Tag, Key, text, div, p, custom, encode
+@docs Html, Tag, Key, text, div, p, custom, isEqual, encode
 
 
 # Attribute
@@ -62,6 +62,11 @@ custom tag attrs entries =
 encode : Html -> Value
 encode =
     Markup.encode
+
+
+isEqual : Html -> Html -> Bool
+isEqual =
+    Markup.isEqual
 
 
 
