@@ -1,7 +1,9 @@
 module Markup exposing
-    ( Markup, node, tagNode, text, isEqual, encode
+    ( Markup, node, tagNode, text, lazy, isEqual, encode
+    , Seed, hash
     , Tag, tag
     , Key, key
+    , Memo, memoInit, memo, memoWith
     , Attribute, at, ev, attribute, event
     )
 
@@ -10,9 +12,15 @@ module Markup exposing
 
 # Markup
 
-@docs Markup, node, tagNode, text, isEqual, encode
+@docs Markup, node, tagNode, text, lazy, isEqual, encode
+@docs Seed, hash
 @docs Tag, tag
 @docs Key, key
+
+
+# Memo
+
+@docs Memo, memoInit, memo, memoWith
 
 
 # Attribute
@@ -111,9 +119,19 @@ text str =
     Markup (FNV1a.hashWithSeed str seedForText) (Encode.string str)
 
 
+lazy : Memo value -> Markup
+lazy (Memo _ markup) =
+    markup
+
+
 isEqual : Markup -> Markup -> Bool
 isEqual (Markup a _) (Markup b _) =
     a == b
+
+
+hash : Markup -> Seed
+hash (Markup seed _) =
+    seed
 
 
 encode : Markup -> Value
@@ -169,6 +187,37 @@ encodeEntries =
 seedForText : Seed
 seedForText =
     FNV1a.hash "text"
+
+
+
+-- Memo
+
+
+type Memo a
+    = Memo a Markup
+
+
+memoInit : (a -> Markup) -> a -> Memo a
+memoInit view a =
+    Memo a (view a)
+
+
+memo : (a -> Markup) -> a -> Memo a -> Memo a
+memo view a ((Memo b _) as memoized) =
+    if a == b then
+        memoized
+
+    else
+        Memo a (view a)
+
+
+memoWith : (a -> a -> Bool) -> (a -> Markup) -> a -> Memo a -> Memo a
+memoWith equals view a ((Memo b _) as memoized) =
+    if equals a b then
+        memoized
+
+    else
+        Memo a (view a)
 
 
 
