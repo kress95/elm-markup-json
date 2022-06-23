@@ -19,7 +19,7 @@ module Markup.Html exposing
 
 import Dict exposing (Dict)
 import Json.Encode exposing (Value)
-import Json.HashEncode exposing (HashValue)
+import Markup.Json.Encode exposing (MarkupValue)
 import Markup exposing (Markup)
 
 
@@ -77,12 +77,12 @@ type alias Attribute =
     Markup.Attribute
 
 
-attribute : String -> HashValue -> Attribute
+attribute : String -> MarkupValue -> Attribute
 attribute =
     Markup.attribute
 
 
-event : String -> HashValue -> Attribute
+event : String -> MarkupValue -> Attribute
 event =
     Markup.event
 

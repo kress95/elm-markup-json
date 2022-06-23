@@ -1,5 +1,5 @@
-module Json.HashEncode exposing
-    ( HashValue, hash, value, isEqual
+module Markup.Json.Encode exposing
+    ( MarkupValue, hash, value, isEqual
     , string, int, int32, int52, float, float64, bool, null
     , list, array, set
     , object, objectWithHash, dict
@@ -37,7 +37,7 @@ import Json.Encode as Encode exposing (Value)
 import Set exposing (Set)
 
 
-type HashValue
+type MarkupValue
     = HashValue Seed Value
 
 
@@ -45,58 +45,58 @@ type alias Seed =
     Int
 
 
-hash : HashValue -> Seed
+hash : MarkupValue -> Seed
 hash (HashValue seed _) =
     seed
 
 
-value : HashValue -> Value
+value : MarkupValue -> Value
 value (HashValue _ a) =
     a
 
 
-isEqual : HashValue -> HashValue -> Bool
+isEqual : MarkupValue -> MarkupValue -> Bool
 isEqual (HashValue a _) (HashValue b _) =
     a == b
 
 
-string : String -> HashValue
+string : String -> MarkupValue
 string a =
     HashValue (FNV1a.hashWithSeed a stringSeed)
         (Encode.string a)
 
 
-int : Int -> HashValue
+int : Int -> MarkupValue
 int a =
     HashValue (hashIntWithSeed a intSeed)
         (Encode.int a)
 
 
-int32 : Int -> HashValue
+int32 : Int -> MarkupValue
 int32 a =
     HashValue (hashInt32WithSeed a intSeed)
         (Encode.int a)
 
 
-int52 : Int -> HashValue
+int52 : Int -> MarkupValue
 int52 a =
     HashValue (FNV1a.hashWithSeed (String.fromInt a) intSeed)
         (Encode.int a)
 
 
-float : Float -> HashValue
+float : Float -> MarkupValue
 float a =
     HashValue (hashFloatWithSeed a floatSeed)
         (Encode.float a)
 
 
-float64 : Float -> HashValue
+float64 : Float -> MarkupValue
 float64 a =
     HashValue (FNV1a.hashWithSeed (String.fromFloat a) floatSeed)
         (Encode.float a)
 
 
-bool : Bool -> HashValue
+bool : Bool -> MarkupValue
 bool a =
     if a then
         true
@@ -105,27 +105,27 @@ bool a =
         false
 
 
-true : HashValue
+true : MarkupValue
 true =
     HashValue (FNV1a.hash "true") (Encode.bool True)
 
 
-false : HashValue
+false : MarkupValue
 false =
     HashValue (FNV1a.hash "false") (Encode.bool False)
 
 
-null : HashValue
+null : MarkupValue
 null =
     HashValue (FNV1a.hash "null") Encode.null
 
 
-list : (value -> HashValue) -> List value -> HashValue
+list : (value -> MarkupValue) -> List value -> MarkupValue
 list func entries =
     listHelp arraySeed func entries
 
 
-array : (value -> HashValue) -> Array value -> HashValue
+array : (value -> MarkupValue) -> Array value -> MarkupValue
 array func entries =
     let
         values =
@@ -135,18 +135,18 @@ array func entries =
         (Encode.array value values)
 
 
-set : (value -> HashValue) -> Set value -> HashValue
+set : (value -> MarkupValue) -> Set value -> MarkupValue
 set func entries =
     listHelp arraySeed func (Set.toList entries)
 
 
-object : List ( String, HashValue ) -> HashValue
+object : List ( String, MarkupValue ) -> MarkupValue
 object pairs =
     HashValue (List.foldl hashPair objectSeed pairs)
         (Encode.object (List.map toEntry pairs))
 
 
-objectWithHash : String -> List ( String, HashValue ) -> HashValue
+objectWithHash : String -> List ( String, MarkupValue ) -> MarkupValue
 objectWithHash key pairs =
     let
         seed =
@@ -156,7 +156,7 @@ objectWithHash key pairs =
         (Encode.object (( key, Encode.int seed ) :: List.map toEntry pairs))
 
 
-dict : (k -> String) -> (v -> HashValue) -> Dict k v -> HashValue
+dict : (k -> String) -> (v -> MarkupValue) -> Dict k v -> MarkupValue
 dict toKey encode dictionary =
     let
         ( seed, values ) =
@@ -194,12 +194,12 @@ objectSeed =
     FNV1a.hash "object"
 
 
-hashValue : HashValue -> Int -> Int
+hashValue : MarkupValue -> Int -> Int
 hashValue (HashValue seed _) =
     joinSeed seed
 
 
-hashPair : ( String, HashValue ) -> Int -> Int
+hashPair : ( String, MarkupValue ) -> Int -> Int
 hashPair ( key, HashValue valueHash _ ) seed =
     let
         keyHash =
@@ -208,12 +208,12 @@ hashPair ( key, HashValue valueHash _ ) seed =
     combineSeed (joinSeed keyHash valueHash) seed
 
 
-toEntry : ( String, HashValue ) -> ( String, Value )
+toEntry : ( String, MarkupValue ) -> ( String, Value )
 toEntry ( key, HashValue _ a ) =
     ( key, a )
 
 
-listHelp : Int -> (value -> HashValue) -> List value -> HashValue
+listHelp : Int -> (value -> MarkupValue) -> List value -> MarkupValue
 listHelp seed func entries =
     let
         values =
@@ -223,7 +223,7 @@ listHelp seed func entries =
         (Encode.list value values)
 
 
-dictHelp : (k -> String) -> (v -> HashValue) -> Dict k v -> ( Int, Dict String HashValue )
+dictHelp : (k -> String) -> (v -> MarkupValue) -> Dict k v -> ( Int, Dict String MarkupValue )
 dictHelp toKey encode =
     Dict.foldl
         (\k v ( seed, dictionary ) ->

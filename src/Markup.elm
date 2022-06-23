@@ -32,7 +32,7 @@ module Markup exposing
 import Bitwise as Bit
 import FNV1a
 import Json.Encode as Encode exposing (Value)
-import Json.HashEncode as HashEncode exposing (HashValue)
+import Markup.Json.Encode as HashEncode exposing (MarkupValue)
 
 
 
@@ -228,7 +228,7 @@ type Attribute
     = Attribute Seed Seed ( String, Value )
 
 
-at : String -> HashValue -> Attribute
+at : String -> MarkupValue -> Attribute
 at str value =
     let
         valueSeed =
@@ -240,7 +240,7 @@ at str value =
         ( str, encodeAttribute valueSeed (HashEncode.value value) )
 
 
-ev : String -> HashValue -> Attribute
+ev : String -> MarkupValue -> Attribute
 ev str value =
     let
         valueSeed =
@@ -252,7 +252,7 @@ ev str value =
         ( str, encodeEvent valueSeed (HashEncode.value value) )
 
 
-attribute : String -> HashValue -> Attribute
+attribute : String -> MarkupValue -> Attribute
 attribute str =
     let
         keySeed =
@@ -269,7 +269,7 @@ attribute str =
             ( str, encodeAttribute valueSeed (HashEncode.value value) )
 
 
-event : String -> HashValue -> Attribute
+event : String -> MarkupValue -> Attribute
 event str =
     let
         keySeed =
