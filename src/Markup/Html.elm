@@ -1,6 +1,5 @@
 module Markup.Html exposing
     ( Html, Attribute, text, node, encode, isEqual
-    , Memo, lazy
     , h1, h2, h3, h4, h5, h6
     , div, p, hr, pre, blockquote
     , span, a, code, em, strong, i, b, u, sub, sup, br
@@ -22,7 +21,6 @@ module Markup.Html exposing
 {-|
 
 @docs Html, Attribute, text, node, encode, isEqual
-@docs Memo, lazy
 @docs h1, h2, h3, h4, h5, h6
 @docs div, p, hr, pre, blockquote
 @docs span, a, code, em, strong, i, b, u, sub, sup, br
@@ -55,10 +53,6 @@ type alias Attribute =
     Markup.Attribute
 
 
-type alias Memo value =
-    Markup.Memo value
-
-
 node : String -> List Attribute -> List Html -> Html
 node tag =
     let
@@ -71,11 +65,6 @@ node tag =
 text : String -> Html
 text =
     Markup.text
-
-
-lazy : Memo value -> Html
-lazy =
-    Markup.lazy
 
 
 encode : Html -> Value
