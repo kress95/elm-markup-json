@@ -271,6 +271,7 @@ attribute str =
 
 event : String -> MarkupValue -> Attribute
 event str =
+    -- TODO: prevent default / stop propagation
     let
         keySeed =
             FNV1a.hashWithSeed str seedForAttribute

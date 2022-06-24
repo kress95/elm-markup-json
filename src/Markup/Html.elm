@@ -19,8 +19,8 @@ module Markup.Html exposing
 
 import Dict exposing (Dict)
 import Json.Encode exposing (Value)
-import Markup.Json.Encode exposing (MarkupValue)
 import Markup exposing (Markup)
+import Markup.Json.Encode exposing (MarkupValue)
 
 
 
