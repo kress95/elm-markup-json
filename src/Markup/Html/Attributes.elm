@@ -1,6 +1,6 @@
 module Markup.Html.Attributes exposing
-    ( style, property, attribute, map
-    , class, classList, id, title, hidden
+    ( property, event
+    , style, class, classList, id, title, hidden
     , type_, value, checked, placeholder, selected
     , accept, acceptCharset, action, autocomplete, autofocus
     , disabled, enctype, list, maxlength, minlength, method, multiple
@@ -21,8 +21,8 @@ module Markup.Html.Attributes exposing
 
 {-|
 
-@docs style, property, attribute, map
-@docs class, classList, id, title, hidden
+@docs property, event
+@docs style, class, classList, id, title, hidden
 @docs type_, value, checked, placeholder, selected
 @docs accept, acceptCharset, action, autocomplete, autofocus
 @docs disabled, enctype, list, maxlength, minlength, method, multiple
@@ -46,6 +46,16 @@ import Markup exposing (Attribute, key)
 import Markup.Json.Encode as Encode exposing (MarkupValue)
 
 
+property : String -> MarkupValue -> Attribute
+property =
+    Markup.attribute
+
+
+event : String -> MarkupValue -> Attribute
+event =
+    Markup.event
+
+
 style : List ( String, String ) -> Attribute
 style =
     let
@@ -64,11 +74,6 @@ classList classes =
         String.join " " <|
             List.map Tuple.first <|
                 List.filter Tuple.second classes
-
-
-property : String -> MarkupValue -> Attribute
-property =
-    Markup.at
 
 
 intProperty : String -> Int -> Attribute
@@ -96,16 +101,6 @@ boolProperty key =
             Markup.attribute key
     in
     \bool -> attr (Encode.bool bool)
-
-
-attribute : String -> String -> Attribute
-attribute key string =
-    Markup.at key (Encode.string string)
-
-
-map : (a -> b) -> Attribute -> Attribute
-map _ g =
-    g
 
 
 class : String -> Attribute
