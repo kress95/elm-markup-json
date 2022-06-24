@@ -10,7 +10,7 @@ module Markup.Json.Encode exposing
 
 # Encoding
 
-@docs HashValue, hash, value, isEqual
+@docs MarkupValue, hash, value, isEqual
 
 
 # Primitives
