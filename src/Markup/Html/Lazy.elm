@@ -1,22 +1,13 @@
-module Markup.Html.Lazy exposing (Memo, lazy, init, memo, memoWith)
+module Markup.Html.Lazy exposing (init, memo, memoWith)
 
 {-|
 
-@docs Memo, lazy, init, memo, memoWith
+@docs init, memo, memoWith
 
 -}
 
 import Markup
-import Markup.Html exposing (Html)
-
-
-type alias Memo value =
-    Markup.Memo value
-
-
-lazy : Memo value -> Html
-lazy =
-    Markup.lazy
+import Markup.Html exposing (Html, Memo)
 
 
 init : (value -> Html) -> value -> Memo value
