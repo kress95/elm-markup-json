@@ -5,8 +5,7 @@ module Markup.Html.Events exposing
     , onMouseOver, onMouseOut
     , onInput, onCheck, onSubmit
     , onBlur, onFocus
-    , on, preventDefaultOn, stopPropagationOn
-    , custom
+    , on, preventDefaultOn, stopPropagationOn, custom
     )
 
 {-|
@@ -17,7 +16,7 @@ module Markup.Html.Events exposing
 @docs onMouseOver, onMouseOut
 @docs onInput, onCheck, onSubmit
 @docs onBlur, onFocus
-@docs on, preventDefaultOn, stopPropagationOn
+@docs on, preventDefaultOn, stopPropagationOn, custom
 
 -}
 
@@ -67,7 +66,7 @@ onMouseOut =
 
 onInput : MarkupValue -> Attribute
 onInput =
-    Markup.defineEvent "input"
+    custom "input" { preventDefault = False, stopPropagation = True }
 
 
 onCheck : MarkupValue -> Attribute
@@ -77,7 +76,7 @@ onCheck =
 
 onSubmit : MarkupValue -> Attribute
 onSubmit =
-    Markup.defineEvent "submit"
+    custom "submit" { preventDefault = True, stopPropagation = False }
 
 
 onBlur : MarkupValue -> Attribute
@@ -96,15 +95,15 @@ on =
 
 
 preventDefaultOn : String -> MarkupValue -> Attribute
-preventDefaultOn =
-    Markup.definePreventDefaultEvent
+preventDefaultOn name =
+    Markup.defineHtmlEvent name True False
 
 
 stopPropagationOn : String -> MarkupValue -> Attribute
-stopPropagationOn =
-    Markup.defineStopPropagationEvent
+stopPropagationOn name =
+    Markup.defineHtmlEvent name False True
 
 
-custom : String -> MarkupValue -> Attribute
-custom =
-    Markup.defineEvent
+custom : String -> { preventDefault : Bool, stopPropagation : Bool } -> MarkupValue -> Attribute
+custom name { preventDefault, stopPropagation } =
+    Markup.defineHtmlEvent name preventDefault stopPropagation
