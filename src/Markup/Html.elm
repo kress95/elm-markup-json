@@ -57,7 +57,7 @@ node : String -> List Attribute -> List Html -> Html
 node tag =
     let
         custom =
-            Markup.tagNode (Markup.tag tag)
+            Markup.htmlNode (Markup.tag tag)
     in
     \attrs entries -> custom attrs (List.indexedMap withKey entries)
 

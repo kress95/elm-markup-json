@@ -1,9 +1,10 @@
 module Markup exposing
-    ( Markup, node, tagNode, text, isEqual, encode
+    ( Markup, node, htmlNode, text, isEqual, encode
     , Seed, hash
     , Tag, tag
     , Key, key
-    , Attribute, at, ev, attribute, event
+    , Attribute, attribute, event, htmlEvent
+    , defineAttribute, defineEvent, defineHtmlEvent
     )
 
 {-|
@@ -11,7 +12,7 @@ module Markup exposing
 
 # Markup
 
-@docs Markup, node, tagNode, text, lazy, isEqual, encode
+@docs Markup, node, htmlNode, text, lazy, isEqual, encode
 @docs Seed, hash
 @docs Tag, tag
 @docs Key, key
@@ -24,7 +25,8 @@ module Markup exposing
 
 # Attribute
 
-@docs Attribute, at, ev, attribute, event
+@docs Attribute, attribute, event, htmlEvent
+@docs defineAttribute, defineEvent, defineHtmlEvent
 
 -}
 
@@ -64,8 +66,8 @@ key str =
     Key (FNV1a.hashWithSeed str seedForKey) str (Encode.string str)
 
 
-tagNode : Tag -> List Attribute -> List ( Key, Markup ) -> Markup
-tagNode (Tag tagSeed tagValue) attrs entries =
+htmlNode : Tag -> List Attribute -> List ( Key, Markup ) -> Markup
+htmlNode (Tag tagSeed tagValue) attrs entries =
     let
         attrsSeed =
             hashAttributes attrs
@@ -191,8 +193,8 @@ type Attribute
     = Attribute Seed Seed ( String, Value )
 
 
-at : String -> MarkupValue -> Attribute
-at str value =
+attribute : String -> MarkupValue -> Attribute
+attribute str value =
     let
         valueSeed =
             HashEncode.hash value
@@ -203,20 +205,8 @@ at str value =
         ( str, encodeAttribute valueSeed (HashEncode.value value) )
 
 
-ev : String -> MarkupValue -> Attribute
-ev str value =
-    let
-        valueSeed =
-            joinSeed (HashEncode.hash value) seedForEvent
-    in
-    Attribute
-        (FNV1a.hashWithSeed str seedForAttribute)
-        valueSeed
-        ( str, encodeEvent valueSeed (HashEncode.value value) )
-
-
-attribute : String -> MarkupValue -> Attribute
-attribute str =
+defineAttribute : String -> MarkupValue -> Attribute
+defineAttribute str =
     let
         keySeed =
             FNV1a.hashWithSeed str seedForAttribute
@@ -233,8 +223,19 @@ attribute str =
 
 
 event : String -> MarkupValue -> Attribute
-event str =
-    -- TODO: prevent default / stop propagation
+event str value =
+    let
+        valueSeed =
+            joinSeed (HashEncode.hash value) seedForEvent
+    in
+    Attribute
+        (FNV1a.hashWithSeed str seedForAttribute)
+        valueSeed
+        ( str, encodeEvent valueSeed (HashEncode.value value) )
+
+
+defineEvent : String -> MarkupValue -> Attribute
+defineEvent str =
     let
         keySeed =
             FNV1a.hashWithSeed str seedForAttribute
@@ -248,6 +249,73 @@ event str =
             keySeed
             valueSeed
             ( str, encodeEvent valueSeed (HashEncode.value value) )
+
+
+htmlEvent : String -> Bool -> Bool -> MarkupValue -> Attribute
+htmlEvent str stopPropagation preventDefault value =
+    let
+        valueSeed0 =
+            joinSeed (HashEncode.hash value) seedForEvent
+
+        valueSeed1 =
+            if stopPropagation then
+                joinSeed seedForStopPropagation valueSeed0
+
+            else
+                valueSeed0
+
+        valueSeed2 =
+            if preventDefault then
+                joinSeed seedForPreventDefault valueSeed1
+
+            else
+                valueSeed1
+    in
+    Attribute
+        (FNV1a.hashWithSeed str seedForAttribute)
+        valueSeed2
+        ( str
+        , encodeHtmlEvent valueSeed2
+            stopPropagation
+            preventDefault
+            (HashEncode.value value)
+        )
+
+
+defineHtmlEvent : String -> Bool -> Bool -> MarkupValue -> Attribute
+defineHtmlEvent str =
+    let
+        keySeed =
+            FNV1a.hashWithSeed str seedForAttribute
+    in
+    \stopPropagation preventDefault value ->
+        let
+            valueSeed0 =
+                joinSeed (HashEncode.hash value) seedForEvent
+
+            valueSeed1 =
+                if stopPropagation then
+                    joinSeed seedForStopPropagation valueSeed0
+
+                else
+                    valueSeed0
+
+            valueSeed2 =
+                if preventDefault then
+                    joinSeed seedForPreventDefault valueSeed1
+
+                else
+                    valueSeed1
+        in
+        Attribute
+            keySeed
+            valueSeed2
+            ( str
+            , encodeHtmlEvent valueSeed2
+                stopPropagation
+                preventDefault
+                (HashEncode.value value)
+            )
 
 
 
@@ -287,9 +355,54 @@ encodeEvent seed context =
         ]
 
 
+encodeHtmlEvent : Seed -> Bool -> Bool -> Value -> Value
+encodeHtmlEvent seed preventDefault stopPropagation context =
+    let
+        properties0 =
+            [ ( "hash", Encode.int seed )
+            , eventTag
+            , ( "context", context )
+            ]
+
+        properties1 =
+            if preventDefault then
+                preventDefaultTag :: properties0
+
+            else
+                properties0
+    in
+    Encode.object
+        (if stopPropagation then
+            stopPropagationTag :: properties1
+
+         else
+            properties1
+        )
+
+
 eventTag : ( String, Value )
 eventTag =
     ( "event", Encode.bool True )
+
+
+preventDefaultTag : ( String, Value )
+preventDefaultTag =
+    ( "preventDefault", Encode.bool True )
+
+
+stopPropagationTag : ( String, Value )
+stopPropagationTag =
+    ( "stopPropagation", Encode.bool True )
+
+
+seedForPreventDefault : Seed
+seedForPreventDefault =
+    FNV1a.hash "preventDefault"
+
+
+seedForStopPropagation : Seed
+seedForStopPropagation =
+    FNV1a.hash "stopPropagation"
 
 
 

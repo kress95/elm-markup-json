@@ -48,12 +48,12 @@ import Markup.Json.Encode as Encode exposing (MarkupValue)
 
 property : String -> MarkupValue -> Attribute
 property =
-    Markup.attribute
+    Markup.defineAttribute
 
 
 event : String -> MarkupValue -> Attribute
 event =
-    Markup.event
+    Markup.defineEvent
 
 
 style : List ( String, String ) -> Attribute
@@ -80,7 +80,7 @@ intProperty : String -> Int -> Attribute
 intProperty key =
     let
         attr =
-            Markup.attribute key
+            Markup.defineAttribute key
     in
     \int -> attr (Encode.string (String.fromInt int))
 
@@ -89,7 +89,7 @@ stringProperty : String -> String -> Attribute
 stringProperty key =
     let
         attr =
-            Markup.attribute key
+            Markup.defineAttribute key
     in
     \string -> attr (Encode.string string)
 
@@ -98,7 +98,7 @@ boolProperty : String -> Bool -> Attribute
 boolProperty key =
     let
         attr =
-            Markup.attribute key
+            Markup.defineAttribute key
     in
     \bool -> attr (Encode.bool bool)
 
@@ -179,7 +179,6 @@ tabindex =
 
 src : String -> Attribute
 src =
-    -- TODO: noJavaScriptOrHtmlUri
     stringProperty "src"
 
 
@@ -285,7 +284,6 @@ acceptCharset =
 
 action : String -> Attribute
 action =
-    -- TODO: noJavaScriptUri
     stringProperty "action"
 
 
@@ -447,7 +445,6 @@ cite =
 
 href : String -> Attribute
 href =
-    -- TODO: noJavaScriptUri
     stringProperty "href"
 
 

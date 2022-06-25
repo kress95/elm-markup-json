@@ -50,7 +50,7 @@ type alias Key =
 
 node : String -> List Attribute -> List ( Key, Html ) -> Html
 node tag =
-    Markup.tagNode (Markup.tag tag)
+    Markup.htmlNode (Markup.tag tag)
 
 
 section : List Attribute -> List ( Key, Html ) -> Html

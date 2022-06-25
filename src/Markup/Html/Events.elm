@@ -5,7 +5,7 @@ module Markup.Html.Events exposing
     , onMouseOver, onMouseOut
     , onInput, onCheck, onSubmit
     , onBlur, onFocus
-    , on
+    , on, event
     )
 
 {-|
@@ -16,7 +16,7 @@ module Markup.Html.Events exposing
 @docs onMouseOver, onMouseOut
 @docs onInput, onCheck, onSubmit
 @docs onBlur, onFocus
-@docs on
+@docs on, event
 
 -}
 
@@ -26,69 +26,74 @@ import Markup.Json.Encode exposing (MarkupValue)
 
 onClick : MarkupValue -> Attribute
 onClick =
-    on "click"
+    Markup.defineHtmlEvent "click" False False
 
 
 onDoubleClick : MarkupValue -> Attribute
 onDoubleClick =
-    on "dblclick"
+    Markup.defineHtmlEvent "dblclick" False False
 
 
 onMouseDown : MarkupValue -> Attribute
 onMouseDown =
-    on "mousedown"
+    Markup.defineHtmlEvent "mousedown" False False
 
 
 onMouseUp : MarkupValue -> Attribute
 onMouseUp =
-    on "mouseup"
+    Markup.defineHtmlEvent "mouseup" False False
 
 
 onMouseEnter : MarkupValue -> Attribute
 onMouseEnter =
-    on "mouseenter"
+    Markup.defineHtmlEvent "mouseenter" False False
 
 
 onMouseLeave : MarkupValue -> Attribute
 onMouseLeave =
-    on "mouseleave"
+    Markup.defineHtmlEvent "mouseleave" False False
 
 
 onMouseOver : MarkupValue -> Attribute
 onMouseOver =
-    on "mouseover"
+    Markup.defineHtmlEvent "mouseover" False False
 
 
 onMouseOut : MarkupValue -> Attribute
 onMouseOut =
-    on "mouseout"
+    Markup.defineHtmlEvent "mouseout" False False
 
 
 onInput : MarkupValue -> Attribute
 onInput =
-    on "input"
+    Markup.defineHtmlEvent "input" True False
 
 
 onCheck : MarkupValue -> Attribute
 onCheck =
-    on "change"
+    Markup.defineHtmlEvent "change" False False
 
 
 onSubmit : MarkupValue -> Attribute
 onSubmit =
-    on "submit"
+    Markup.defineHtmlEvent "submit" False True
 
 
 onBlur : MarkupValue -> Attribute
 onBlur =
-    on "blur"
+    Markup.defineHtmlEvent "blur" False False
 
 
 onFocus : MarkupValue -> Attribute
 onFocus =
-    on "focus"
+    Markup.defineHtmlEvent "focus" False False
 
 
-on : String -> MarkupValue -> Attribute
+on : String -> Bool -> Bool -> MarkupValue -> Attribute
 on =
-    Markup.event
+    Markup.htmlEvent
+
+
+event : String -> Bool -> Bool -> MarkupValue -> Attribute
+event =
+    Markup.defineHtmlEvent
