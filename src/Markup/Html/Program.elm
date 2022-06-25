@@ -1,4 +1,4 @@
-module Markup.Html.Program exposing (MarkupCmd, MarkupSub, Msg, Program, program)
+module Markup.Html.Program exposing (Command, Subscription, Msg, Program, program)
 
 import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
@@ -7,8 +7,8 @@ import Markup.Html exposing (Html)
 import Platform
 
 
-type State model
-    = State (Internal model)
+type Model model
+    = Model (Internal model)
 
 
 type alias Internal model =
@@ -23,16 +23,16 @@ type Msg msg
     | AnimationFrame
 
 
-type alias MarkupCmd msg =
+type alias Command msg =
     Cmd (Msg msg)
 
 
-type alias MarkupSub msg =
+type alias Subscription msg =
     Sub (Msg msg)
 
 
 type alias Program flags model msg =
-    Platform.Program flags (State model) (Msg msg)
+    Platform.Program flags (Model model) (Msg msg)
 
 
 program :
@@ -40,8 +40,8 @@ program :
     , view : model -> Html
     , update : msg -> model -> ( model, Cmd msg )
     , subscriptions : model -> Sub msg
-    , send : Value -> MarkupCmd msg
-    , receive : (Value -> Msg msg) -> MarkupSub msg
+    , send : Value -> Command msg
+    , receive : (Value -> Msg msg) -> Subscription msg
     , expect : Decoder msg
     , onError : Decode.Error -> msg
     }
@@ -65,14 +65,14 @@ program config =
                 markup =
                     view model
             in
-            ( State { model = model, dirty = False, hash = Markup.hash markup }
+            ( Model { model = model, dirty = False, hash = Markup.hash markup }
             , Cmd.batch
                 [ Cmd.map Msg cmd
                 , sendMarkup markup
                 ]
             )
 
-        update_ msg (State ({ model, dirty } as state)) =
+        update_ msg (Model ({ model, dirty } as state)) =
             case msg of
                 Msg updateMsg ->
                     let
@@ -80,7 +80,7 @@ program config =
                             update updateMsg model
 
                         state_ =
-                            State { state | model = model_, dirty = True }
+                            Model { state | model = model_, dirty = True }
                     in
                     if dirty then
                         ( state_
@@ -104,7 +104,7 @@ program config =
                             Markup.hash markup
 
                         state_ =
-                            State { state | hash = hash, dirty = False }
+                            Model { state | hash = hash, dirty = False }
                     in
                     if hash == state.hash then
                         ( state_, Cmd.none )
@@ -112,7 +112,7 @@ program config =
                     else
                         ( state_, sendMarkup markup )
 
-        subscriptions_ (State { model }) =
+        subscriptions_ (Model { model }) =
             Sub.batch
                 [ Sub.map Msg (subscriptions model)
                 , receive (decode expect onError)
