@@ -5,7 +5,8 @@ module Markup.Html.Events exposing
     , onMouseOver, onMouseOut
     , onInput, onCheck, onSubmit
     , onBlur, onFocus
-    , on, event
+    , on, preventDefaultOn, stopPropagationOn
+    , custom
     )
 
 {-|
@@ -16,7 +17,7 @@ module Markup.Html.Events exposing
 @docs onMouseOver, onMouseOut
 @docs onInput, onCheck, onSubmit
 @docs onBlur, onFocus
-@docs on, event
+@docs on, preventDefaultOn, stopPropagationOn
 
 -}
 
@@ -26,74 +27,84 @@ import Markup.Json.Encode exposing (MarkupValue)
 
 onClick : MarkupValue -> Attribute
 onClick =
-    Markup.defineHtmlEvent "click" False False
+    Markup.defineEvent "click"
 
 
 onDoubleClick : MarkupValue -> Attribute
 onDoubleClick =
-    Markup.defineHtmlEvent "dblclick" False False
+    Markup.defineEvent "dblclick"
 
 
 onMouseDown : MarkupValue -> Attribute
 onMouseDown =
-    Markup.defineHtmlEvent "mousedown" False False
+    Markup.defineEvent "mousedown"
 
 
 onMouseUp : MarkupValue -> Attribute
 onMouseUp =
-    Markup.defineHtmlEvent "mouseup" False False
+    Markup.defineEvent "mouseup"
 
 
 onMouseEnter : MarkupValue -> Attribute
 onMouseEnter =
-    Markup.defineHtmlEvent "mouseenter" False False
+    Markup.defineEvent "mouseenter"
 
 
 onMouseLeave : MarkupValue -> Attribute
 onMouseLeave =
-    Markup.defineHtmlEvent "mouseleave" False False
+    Markup.defineEvent "mouseleave"
 
 
 onMouseOver : MarkupValue -> Attribute
 onMouseOver =
-    Markup.defineHtmlEvent "mouseover" False False
+    Markup.defineEvent "mouseover"
 
 
 onMouseOut : MarkupValue -> Attribute
 onMouseOut =
-    Markup.defineHtmlEvent "mouseout" False False
+    Markup.defineEvent "mouseout"
 
 
 onInput : MarkupValue -> Attribute
 onInput =
-    Markup.defineHtmlEvent "input" True False
+    Markup.defineEvent "input"
 
 
 onCheck : MarkupValue -> Attribute
 onCheck =
-    Markup.defineHtmlEvent "change" False False
+    Markup.defineEvent "change"
 
 
 onSubmit : MarkupValue -> Attribute
 onSubmit =
-    Markup.defineHtmlEvent "submit" False True
+    Markup.defineEvent "submit"
 
 
 onBlur : MarkupValue -> Attribute
 onBlur =
-    Markup.defineHtmlEvent "blur" False False
+    Markup.defineEvent "blur"
 
 
 onFocus : MarkupValue -> Attribute
 onFocus =
-    Markup.defineHtmlEvent "focus" False False
+    Markup.defineEvent "focus"
 
 
-on : String -> Bool -> Bool -> MarkupValue -> Attribute
+on : String -> MarkupValue -> Attribute
 on =
-    Markup.htmlEvent
+    Markup.event
 
 
-event : String -> Bool -> Bool -> MarkupValue -> Attribute
-event =
-    Markup.defineHtmlEvent
+preventDefaultOn : String -> MarkupValue -> Attribute
+preventDefaultOn =
+    Markup.definePreventDefaultEvent
+
+
+stopPropagationOn : String -> MarkupValue -> Attribute
+stopPropagationOn =
+    Markup.defineStopPropagationEvent
+
+
+custom : String -> MarkupValue -> Attribute
+custom =
+    Markup.defineEvent
