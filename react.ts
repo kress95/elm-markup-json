@@ -124,11 +124,16 @@ interface NodeRendererState {
   props: NodeProps;
 }
 
-function getEventHandler(event: unknown, send: Send, preventDefault?: true, stopPropagation?: true) {
-  return (value: React.SyntheticEvent ) => {
+function getEventHandler(
+  event: unknown,
+  send: Send,
+  preventDefault?: true,
+  stopPropagation?: true
+) {
+  return (value: React.SyntheticEvent) => {
     if (preventDefault) value.preventDefault();
     if (stopPropagation) value.stopPropagation();
-    send({ event, value })
+    send({ event, value });
   };
 }
 
