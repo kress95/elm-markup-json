@@ -1,11 +1,14 @@
 port module Main exposing (main)
 
+import Effect exposing (Effect)
 import Json.Decode as Decode exposing (Value)
 import Markup.Html as Html exposing (Html)
+import Markup.Html.Events as Events
 import Markup.Html.Lazy as Lazy exposing (Memo)
-import Markup.Html.Program exposing (Program, program)
-import Process
-import Task
+
+
+
+-- MODEL
 
 
 type alias Model =
@@ -15,52 +18,8 @@ type alias Model =
     }
 
 
-type Msg
-    = None
-    | Interval
 
-
-main : Program {} Model Msg
-main =
-    program
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        , send = toHost
-        , receive = fromHost
-        , expect = Decode.succeed None
-        , onError = always None
-        }
-
-
-init : {} -> ( Model, Cmd Msg )
-init _ =
-    ( { frames = 0
-      , halves = Lazy.init viewHalves 0
-      , seconds = Lazy.init someCrazyContainer (viewSeconds 0)
-      }
-    , delay 16 Interval
-    )
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        None ->
-            ( model, Cmd.none )
-
-        Interval ->
-            let
-                frames =
-                    model.frames + 1
-            in
-            ( { frames = frames
-              , halves = Lazy.memo viewHalves (frames // 30) model.halves
-              , seconds = Lazy.memoWith Html.isEqual someCrazyContainer (viewSeconds (frames // 60)) model.seconds
-              }
-            , delay 16 Interval
-            )
+-- VIEW
 
 
 view : Model -> Html
@@ -71,7 +30,9 @@ view model =
             , Html.p [] [ Html.text (String.fromInt model.frames) ]
             ]
         , Html.div []
-            [ Html.p [] [ Html.text "half seconds (memo)" ]
+            [ Html.p
+                []
+                [ Html.text "half seconds (memo)" ]
             , Html.p [] [ Lazy.lazy model.halves ]
             ]
         , Html.div []
@@ -96,14 +57,73 @@ someCrazyContainer =
     List.singleton >> Html.div []
 
 
+
+-- UPDATE
+
+
+type alias Flags =
+    {}
+
+
+type Msg
+    = None
+    | Interval
+
+
+init : Flags -> ( Model, Effect Msg )
+init _ =
+    ( { frames = 0
+      , halves = Lazy.init viewHalves 0
+      , seconds = Lazy.init someCrazyContainer (viewSeconds 0)
+      }
+    , Effect.delay 16 Interval
+    )
+
+
+update : Msg -> Model -> ( Model, Effect Msg )
+update msg model =
+    case msg of
+        None ->
+            ( model, Effect.none )
+
+        Interval ->
+            let
+                frames =
+                    model.frames + 1
+            in
+            ( { frames = frames
+              , halves = Lazy.memo viewHalves (frames // 30) model.halves
+              , seconds = Lazy.memoWith Html.isEqual someCrazyContainer (viewSeconds (frames // 60)) model.seconds
+              }
+            , Effect.delay 16 Interval
+            )
+
+
+
+-- SUBSCRIPTIONS
+
+
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.none
 
 
-delay : Float -> msg -> Cmd msg
-delay time msg =
-    Task.perform (always msg) (Process.sleep time)
+
+-- MAIN
+
+
+main : Effect.Application Flags Model Msg
+main =
+    Effect.application
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        , send = toHost
+        , receive = fromHost
+        , expect = Decode.succeed None
+        , onError = always None
+        }
 
 
 port toHost : Value -> Cmd msg
