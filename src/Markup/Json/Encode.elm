@@ -1,6 +1,6 @@
 module Markup.Json.Encode exposing
     ( MarkupValue, hash, value, isEqual
-    , string, int, int32, int52, float, float64, bool, null
+    , string, int, float, bool, null
     , list, array, set
     , object, objectWithHash, dict
     )
@@ -15,7 +15,7 @@ module Markup.Json.Encode exposing
 
 # Primitives
 
-@docs string, int, int32, int52, float, float64, bool, null
+@docs string, int, float, bool, null
 
 
 # Arrays
@@ -72,27 +72,9 @@ int a =
         (Encode.int a)
 
 
-int32 : Int -> MarkupValue
-int32 a =
-    HashValue (hashInt32WithSeed a intSeed)
-        (Encode.int a)
-
-
-int52 : Int -> MarkupValue
-int52 a =
-    HashValue (FNV1a.hashWithSeed (String.fromInt a) intSeed)
-        (Encode.int a)
-
-
 float : Float -> MarkupValue
 float a =
     HashValue (hashFloatWithSeed a floatSeed)
-        (Encode.float a)
-
-
-float64 : Float -> MarkupValue
-float64 a =
-    HashValue (FNV1a.hashWithSeed (String.fromFloat a) floatSeed)
         (Encode.float a)
 
 
