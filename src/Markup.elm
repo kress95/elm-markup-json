@@ -3,8 +3,8 @@ module Markup exposing
     , Seed, hash
     , Tag, tag
     , Key, key
-    , Attribute, attribute, event, preventDefaultEvent, stopPropagationEvent
-    , defineAttribute, defineEvent, definePreventDefaultEvent, defineStopPropagationEvent
+    , Attribute, attribute, event, htmlEvent
+    , defineAttribute, defineEvent, defineHtmlEvent
     )
 
 {-|
@@ -25,8 +25,8 @@ module Markup exposing
 
 # Attribute
 
-@docs Attribute, attribute, event, preventDefaultEvent, stopPropagationEvent
-@docs defineAttribute, defineEvent, definePreventDefaultEvent, defineStopPropagationEvent
+@docs Attribute, attribute, event, htmlEvent
+@docs defineAttribute, defineEvent, defineHtmlEvent
 
 -}
 
@@ -234,28 +234,30 @@ event str value =
         ( str, encodeEvent valueSeed (HashEncode.value value) )
 
 
-preventDefaultEvent : String -> MarkupValue -> Attribute
-preventDefaultEvent str value =
+htmlEvent : String -> Bool -> Bool -> MarkupValue -> Attribute
+htmlEvent str preventDefault stopPropagation value =
     let
-        valueSeed =
-            joinSeed (HashEncode.hash value) seedForPreventDefaultEvent
+        valueSeed0 =
+            joinSeed (HashEncode.hash value) seedForEvent
+
+        valueSeed1 =
+            if preventDefault then
+                joinSeed valueSeed0 seedForPreventDefault
+
+            else
+                valueSeed0
+
+        valueSeed2 =
+            if stopPropagation then
+                joinSeed valueSeed1 seedForStopPropagation
+
+            else
+                valueSeed1
     in
     Attribute
         (FNV1a.hashWithSeed str seedForAttribute)
-        valueSeed
-        ( str, encodeStopPropagationEvent valueSeed (HashEncode.value value) )
-
-
-stopPropagationEvent : String -> MarkupValue -> Attribute
-stopPropagationEvent str value =
-    let
-        valueSeed =
-            joinSeed (HashEncode.hash value) seedForStopPropagationEvent
-    in
-    Attribute
-        (FNV1a.hashWithSeed str seedForAttribute)
-        valueSeed
-        ( str, encodeStopPropagationEvent valueSeed (HashEncode.value value) )
+        valueSeed2
+        ( str, encodeHtmlEvent valueSeed2 preventDefault stopPropagation (HashEncode.value value) )
 
 
 defineEvent : String -> MarkupValue -> Attribute
@@ -275,38 +277,35 @@ defineEvent str =
             ( str, encodeEvent valueSeed (HashEncode.value value) )
 
 
-definePreventDefaultEvent : String -> MarkupValue -> Attribute
-definePreventDefaultEvent str =
+defineHtmlEvent : String -> Bool -> Bool -> MarkupValue -> Attribute
+defineHtmlEvent str =
     let
         keySeed =
             FNV1a.hashWithSeed str seedForAttribute
     in
-    \value ->
+    \preventDefault stopPropagation value ->
         let
-            valueSeed =
-                joinSeed (HashEncode.hash value) seedForPreventDefaultEvent
+            valueSeed0 =
+                joinSeed (HashEncode.hash value) seedForEvent
+
+            valueSeed1 =
+                if preventDefault then
+                    joinSeed valueSeed0 seedForPreventDefault
+
+                else
+                    valueSeed0
+
+            valueSeed2 =
+                if stopPropagation then
+                    joinSeed valueSeed1 seedForStopPropagation
+
+                else
+                    valueSeed1
         in
         Attribute
             keySeed
-            valueSeed
-            ( str, encodePreventDefaultEvent valueSeed (HashEncode.value value) )
-
-
-defineStopPropagationEvent : String -> MarkupValue -> Attribute
-defineStopPropagationEvent str =
-    let
-        keySeed =
-            FNV1a.hashWithSeed str seedForAttribute
-    in
-    \value ->
-        let
-            valueSeed =
-                joinSeed (HashEncode.hash value) seedForStopPropagationEvent
-        in
-        Attribute
-            keySeed
-            valueSeed
-            ( str, encodeStopPropagationEvent valueSeed (HashEncode.value value) )
+            valueSeed2
+            ( str, encodeHtmlEvent valueSeed2 preventDefault stopPropagation (HashEncode.value value) )
 
 
 
@@ -340,24 +339,30 @@ encodeEvent seed value =
         ]
 
 
-encodePreventDefaultEvent : Seed -> Value -> Value
-encodePreventDefaultEvent seed value =
-    Encode.object
-        [ ( "hash", Encode.int seed )
-        , eventTag
-        , preventDefaultTag
-        , ( "value", value )
-        ]
+encodeHtmlEvent : Seed -> Bool -> Bool -> Value -> Value
+encodeHtmlEvent seed preventDefault stopPropagation value =
+    let
+        props0 =
+            [ ( "hash", Encode.int seed )
+            , eventTag
+            , ( "value", value )
+            ]
 
+        props1 =
+            if preventDefault then
+                preventDefaultTag :: props0
 
-encodeStopPropagationEvent : Seed -> Value -> Value
-encodeStopPropagationEvent seed value =
-    Encode.object
-        [ ( "hash", Encode.int seed )
-        , eventTag
-        , stopPropagationTag
-        , ( "value", value )
-        ]
+            else
+                props0
+
+        props2 =
+            if stopPropagation then
+                stopPropagationTag :: props1
+
+            else
+                props1
+    in
+    Encode.object props2
 
 
 eventTag : ( String, Value )
@@ -375,13 +380,13 @@ stopPropagationTag =
     ( "stopPropagation", Encode.bool True )
 
 
-seedForPreventDefaultEvent : Seed
-seedForPreventDefaultEvent =
+seedForPreventDefault : Seed
+seedForPreventDefault =
     FNV1a.hash "preventDefault"
 
 
-seedForStopPropagationEvent : Seed
-seedForStopPropagationEvent =
+seedForStopPropagation : Seed
+seedForStopPropagation =
     FNV1a.hash "stopPropagation"
 
 
