@@ -3,7 +3,7 @@ port module Main exposing (main)
 import Json.Decode as Decode exposing (Value)
 import Markup.Html as Html exposing (Html)
 import Markup.Html.Lazy as Lazy exposing (Memo)
-import Markup.Program exposing (Program, program)
+import Markup.Html.Program exposing (Program, program)
 import Process
 import Task
 

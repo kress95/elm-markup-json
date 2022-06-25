@@ -15,8 +15,10 @@ export type Attributes = Record<string, Attribute>;
 
 export interface Attribute {
   hash: number;
-  event: boolean;
-  value: unknown;
+  handler?: true;
+  preventDefault?: true;
+  stopPropagation?: true;
+  event: unknown;
 }
 
 export type Entries = Entry[];
@@ -29,7 +31,7 @@ export interface Entry {
 }
 
 export interface Event {
-  context: unknown;
+  event: unknown;
   value: unknown;
 }
 
@@ -122,8 +124,12 @@ interface NodeRendererState {
   props: NodeProps;
 }
 
-function getEventHandler(context: unknown, send: Send) {
-  return (value: unknown) => send({ context, value });
+function getEventHandler(event: unknown, send: Send, preventDefault?: true, stopPropagation?: true) {
+  return (value: React.SyntheticEvent ) => {
+    if (preventDefault) value.preventDefault();
+    if (stopPropagation) value.stopPropagation();
+    send({ event, value })
+  };
 }
 
 function getDerivedProps(
@@ -140,10 +146,10 @@ function getDerivedProps(
 
     if (attr.hash === pastAttrs[name]?.hash) {
       props[name] = pastProps[name];
-    } else if (attr.event) {
-      props[name] = getEventHandler(attr.value, send);
+    } else if (attr.handler) {
+      props[name] = getEventHandler(attr.event, send);
     } else {
-      props[name] = attr.value;
+      props[name] = attr.event;
     }
   }
 
@@ -161,10 +167,10 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
     const props: NodeProps = key === undefined ? {} : { key };
     for (const name in attributes) {
       const attr = attributes[name];
-      if (attr.event) {
-        props[name] = getEventHandler(attr.value, send);
+      if (attr.handler) {
+        props[name] = getEventHandler(attr.event, send);
       } else {
-        props[name] = attr.value;
+        props[name] = attr.event;
       }
     }
     return props;

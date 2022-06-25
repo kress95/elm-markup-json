@@ -1,8 +1,9 @@
-module Markup.Program exposing (MarkupCmd, MarkupSub, Msg, Program, program)
+module Markup.Html.Program exposing (MarkupCmd, MarkupSub, Msg, Program, program)
 
 import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
-import Markup exposing (Markup, Seed)
+import Markup exposing (Seed)
+import Markup.Html exposing (Html)
 import Platform
 
 
@@ -36,7 +37,7 @@ type alias Program flags model msg =
 
 program :
     { init : flags -> ( model, Cmd msg )
-    , view : model -> Markup
+    , view : model -> Html
     , update : msg -> model -> ( model, Cmd msg )
     , subscriptions : model -> Sub msg
     , send : Value -> MarkupCmd msg

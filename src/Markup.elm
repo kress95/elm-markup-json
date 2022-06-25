@@ -334,7 +334,7 @@ encodeEvent : Seed -> Value -> Value
 encodeEvent seed value =
     Encode.object
         [ ( "hash", Encode.int seed )
-        , eventTag
+        , handlerTag
         , ( "value", value )
         ]
 
@@ -344,8 +344,8 @@ encodeHtmlEvent seed preventDefault stopPropagation value =
     let
         props0 =
             [ ( "hash", Encode.int seed )
-            , eventTag
-            , ( "value", value )
+            , handlerTag
+            , ( "event", value )
             ]
 
         props1 =
@@ -365,9 +365,9 @@ encodeHtmlEvent seed preventDefault stopPropagation value =
     Encode.object props2
 
 
-eventTag : ( String, Value )
-eventTag =
-    ( "event", Encode.bool True )
+handlerTag : ( String, Value )
+handlerTag =
+    ( "handler", Encode.bool True )
 
 
 preventDefaultTag : ( String, Value )
