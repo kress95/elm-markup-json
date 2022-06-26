@@ -4,7 +4,7 @@ module Markup.Html.Events.Decode exposing
     , onMouseEnter, onMouseLeave
     , onMouseOver, onMouseOut
     , onInput, onCheck, onSubmit
-    , onBlur, onFocus
+    , onBlur, onFocus, onAny
     )
 
 {-|
@@ -14,91 +14,112 @@ module Markup.Html.Events.Decode exposing
 @docs onMouseEnter, onMouseLeave
 @docs onMouseOver, onMouseOut
 @docs onInput, onCheck, onSubmit
-@docs onBlur, onFocus
+@docs onBlur, onFocus, onAny
 
 -}
 
 import Json.Decode as Decode exposing (Decoder)
 
 
-onClick : Decoder ()
+
+onClick : Decoder msg -> Decoder msg
 onClick =
     eventType "click"
 
 
-onDoubleClick : Decoder ()
+onDoubleClick : Decoder msg -> Decoder msg
 onDoubleClick =
     eventType "dblclick"
 
 
-onMouseDown : Decoder ()
+
+onMouseDown : Decoder msg -> Decoder msg
 onMouseDown =
     eventType "mousedown"
 
 
-onMouseUp : Decoder ()
+
+onMouseUp : Decoder msg -> Decoder msg
 onMouseUp =
     eventType "mouseup"
 
 
-onMouseEnter : Decoder ()
+
+onMouseEnter : Decoder msg -> Decoder msg
 onMouseEnter =
     eventType "mouseenter"
 
 
-onMouseLeave : Decoder ()
+
+onMouseLeave : Decoder msg -> Decoder msg
 onMouseLeave =
     eventType "mouseleave"
 
 
-onMouseOver : Decoder ()
+
+onMouseOver : Decoder msg -> Decoder msg
 onMouseOver =
     eventType "mouseover"
 
 
-onMouseOut : Decoder ()
+
+onMouseOut : Decoder msg -> Decoder msg
 onMouseOut =
     eventType "mouseout"
 
 
-onInput : Decoder ()
+
+onInput : Decoder msg -> Decoder msg
 onInput =
     eventType "input"
 
 
-onCheck : Decoder ()
+
+onCheck : Decoder msg -> Decoder msg
 onCheck =
     eventType "change"
 
 
-onSubmit : Decoder ()
+
+onSubmit : Decoder msg -> Decoder msg
 onSubmit =
     eventType "submit"
 
 
-onBlur : Decoder ()
+
+onBlur : Decoder msg -> Decoder msg
 onBlur =
     eventType "blur"
 
 
-onFocus : Decoder ()
+
+onFocus : Decoder msg -> Decoder msg
 onFocus =
     eventType "focus"
+
+
+
+onAny : Decoder msg -> Decoder msg
+onAny =
+    Decode.field "value"
+
 
 
 
 -- internals
 
 
-eventType : String -> Decoder ()
-eventType evType =
-    Decode.andThen (eventTypeDecoder evType) (Decode.field "type" Decode.string)
+eventType : String -> Decoder msg -> Decoder msg
+eventType event msgDecoder =
+    Decode.at ["event", "type"] Decode.string
+        |> Decode.andThen (eventTypeDecoder msgDecoder event)
 
 
-eventTypeDecoder : String -> String -> Decoder ()
-eventTypeDecoder evType ev =
-    if ev == evType then
-        Decode.succeed ()
+eventTypeDecoder : Decoder msg -> String -> String -> Decoder msg
+eventTypeDecoder msgDecoder force event =
+    if event == force then
+        Decode.field "value" msgDecoder
 
     else
-        Decode.fail ("Expected " ++ evType ++ " event type, but found " ++ ev ++ ".")
+        Decode.fail <|
+            "I was expecting a " ++ force ++ " event, but found " ++ event ++ " instead."

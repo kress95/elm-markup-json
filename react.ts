@@ -18,7 +18,7 @@ export interface Attribute {
   handler?: true;
   preventDefault?: true;
   stopPropagation?: true;
-  event: unknown;
+  value: unknown;
 }
 
 export type Entries = Entry[];
@@ -31,8 +31,8 @@ export interface Entry {
 }
 
 export interface Event {
-  event: unknown;
   value: unknown;
+  event: unknown;
 }
 
 export interface Send {
@@ -124,16 +124,28 @@ interface NodeRendererState {
   props: NodeProps;
 }
 
+function sanitizeNativeEvent(ev: React.SyntheticEvent['nativeEvent']) {
+  const { path, sourceCapabilities, srcElement, target, view, ...nativeEvent} = ev;
+  return nativeEvent;
+}
+
+
+function sanitizeEvent(ev: React.SyntheticEvent) {
+  const {view, currentTarget, getModifierState, isDefaultPrevented, isPropagationStopped, target, nativeEvent, ...event } = ev;
+  return { ...event, nativeEvent: sanitizeNativeEvent(nativeEvent) };
+}
+
 function getEventHandler(
-  event: unknown,
+  value: unknown,
   send: Send,
   preventDefault?: true,
   stopPropagation?: true
 ) {
-  return (value: React.SyntheticEvent) => {
-    if (preventDefault) value.preventDefault();
-    if (stopPropagation) value.stopPropagation();
-    send({ event, value });
+  return (ev: React.SyntheticEvent) => {
+    if (preventDefault) ev.preventDefault();
+    if (stopPropagation) ev.stopPropagation();
+    const event = sanitizeEvent(ev);
+    send({ value, event });
   };
 }
 
@@ -152,9 +164,9 @@ function getDerivedProps(
     if (attr.hash === pastAttrs[name]?.hash) {
       props[name] = pastProps[name];
     } else if (attr.handler) {
-      props[name] = getEventHandler(attr.event, send);
+      props[name] = getEventHandler(attr.value, send);
     } else {
-      props[name] = attr.event;
+      props[name] = attr.value;
     }
   }
 
@@ -173,9 +185,9 @@ class NodeRenderer extends React.Component<NodeRendererProps, NodeRendererState>
     for (const name in attributes) {
       const attr = attributes[name];
       if (attr.handler) {
-        props[name] = getEventHandler(attr.event, send);
+        props[name] = getEventHandler(attr.value, send);
       } else {
-        props[name] = attr.event;
+        props[name] = attr.value;
       }
     }
     return props;

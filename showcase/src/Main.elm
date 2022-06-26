@@ -1,7 +1,8 @@
 port module Main exposing (main)
 
+import Action
 import Effect exposing (Effect)
-import Json.Decode as Decode exposing (Value)
+import Json.Decode as Decode exposing (Decoder, Value)
 import Markup.Html as Html exposing (Html)
 import Markup.Html.Events as Events
 import Markup.Html.Lazy as Lazy exposing (Memo)
@@ -15,6 +16,8 @@ type alias Model =
     { frames : Int
     , halves : Memo Int
     , seconds : Memo Html
+    , clicks : Int
+    , error : Maybe Decode.Error
     }
 
 
@@ -30,14 +33,36 @@ view model =
             , Html.p [] [ Html.text (String.fromInt model.frames) ]
             ]
         , Html.div []
-            [ Html.p
-                []
-                [ Html.text "half seconds (memo)" ]
+            [ Html.p [] [ Html.text "half seconds (memo)" ]
             , Html.p [] [ Lazy.lazy model.halves ]
             ]
         , Html.div []
             [ Html.p [] [ Html.text "seconds (memoWith)" ]
             , Html.p [] [ Lazy.lazy model.seconds ]
+            ]
+        , Html.div [ Events.onClick (Action.example "EAE" False) ]
+            [ Html.p [] [ Html.text "Click here" ]
+            , if model.clicks > 0 then
+                Html.p []
+                    [ Html.text (String.fromInt model.clicks)
+                    , if model.clicks > 1 then
+                        Html.text " clicks"
+
+                      else
+                        Html.text " click"
+                    ]
+
+              else
+                Html.div [] []
+            ]
+        , Html.div [ Events.onClick Action.clearError ]
+            [ Html.p [] [ Html.text "Decode error: " ]
+            , Html.p []
+                [ Maybe.map Decode.errorToString model.error
+                    |> Maybe.withDefault "(none)"
+                    |> Html.text
+                ]
+            , Html.p [] [ Html.text "(click to clear)" ]
             ]
         ]
 
@@ -68,6 +93,17 @@ type alias Flags =
 type Msg
     = None
     | Interval
+    | DecodeError Decode.Error
+    | ClickedView
+    | ClearError
+
+
+expect : Decoder Msg
+expect =
+    Action.decoder
+        { onExampleAction = \_ _ -> ClickedView
+        , onClearError = ClearError
+        }
 
 
 init : Flags -> ( Model, Effect Msg )
@@ -75,6 +111,8 @@ init _ =
     ( { frames = 0
       , halves = Lazy.init viewHalves 0
       , seconds = Lazy.init someCrazyContainer (viewSeconds 0)
+      , clicks = 0
+      , error = Nothing
       }
     , Effect.delay 16 Interval
     )
@@ -91,12 +129,22 @@ update msg model =
                 frames =
                     model.frames + 1
             in
-            ( { frames = frames
-              , halves = Lazy.memo viewHalves (frames // 30) model.halves
-              , seconds = Lazy.memoWith Html.isEqual someCrazyContainer (viewSeconds (frames // 60)) model.seconds
+            ( { model
+                | frames = frames
+                , halves = Lazy.memo viewHalves (frames // 30) model.halves
+                , seconds = Lazy.memoWith Html.isEqual someCrazyContainer (viewSeconds (frames // 60)) model.seconds
               }
             , Effect.delay 16 Interval
             )
+
+        DecodeError error ->
+            ( { model | error = Just error }, Effect.none )
+
+        ClickedView ->
+            ( { model | clicks = model.clicks + 1 }, Effect.none )
+
+        ClearError ->
+            ( { model | error = Nothing }, Effect.none )
 
 
 
@@ -121,8 +169,8 @@ main =
         , subscriptions = subscriptions
         , send = toHost
         , receive = fromHost
-        , expect = Decode.succeed None
-        , onError = always None
+        , expect = expect
+        , onError = DecodeError
         }
 
 

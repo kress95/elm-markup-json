@@ -345,7 +345,7 @@ encodeHtmlEvent seed preventDefault stopPropagation value =
         props0 =
             [ ( "hash", Encode.int seed )
             , handlerTag
-            , ( "event", value )
+            , ( "value", value )
             ]
 
         props1 =
