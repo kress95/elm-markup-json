@@ -1,21 +1,11 @@
 module Markup.Html.Events.Decode exposing
-    ( onBlur
-    , onCheck
-    , onClick
-    , onDoubleClick
-    , onFocus
-    , onInput
-    , onMouseDown
-    , onMouseEnter
-    , onMouseLeave
-    , onMouseOut
-    , onMouseOver
-    , onMouseUp
-    , onSubmit
+    ( onClick, onDoubleClick
+    , onMouseDown, onMouseUp
+    , onMouseEnter, onMouseLeave
+    , onMouseOver, onMouseOut
+    , onInput, onCheck, onSubmit
+    , onBlur, onFocus
     )
-
-import Json.Decode as Decode exposing (Decoder)
-
 
 {-|
 
@@ -27,6 +17,10 @@ import Json.Decode as Decode exposing (Decoder)
 @docs onBlur, onFocus
 
 -}
+
+import Json.Decode as Decode exposing (Decoder)
+
+
 onClick : Decoder ()
 onClick =
     eventType "click"
