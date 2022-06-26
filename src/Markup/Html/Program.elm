@@ -1,4 +1,4 @@
-module Markup.Html.Program exposing (Command, Subscription, Msg, Program, program)
+module Markup.Html.Program exposing (Command, Msg, Program, Subscription, program)
 
 import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
