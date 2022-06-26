@@ -26,67 +26,67 @@ import Markup.Json.Encode exposing (MarkupValue)
 
 onClick : MarkupValue -> Attribute
 onClick =
-    Markup.defineEvent "click"
+    Markup.defineEvent "onClick"
 
 
 onDoubleClick : MarkupValue -> Attribute
 onDoubleClick =
-    Markup.defineEvent "dblclick"
+    Markup.defineEvent "onDoubleClick"
 
 
 onMouseDown : MarkupValue -> Attribute
 onMouseDown =
-    Markup.defineEvent "mousedown"
+    Markup.defineEvent "onMouseDown"
 
 
 onMouseUp : MarkupValue -> Attribute
 onMouseUp =
-    Markup.defineEvent "mouseup"
+    Markup.defineEvent "onMouseUp"
 
 
 onMouseEnter : MarkupValue -> Attribute
 onMouseEnter =
-    Markup.defineEvent "mouseenter"
+    Markup.defineEvent "onMouseEnter"
 
 
 onMouseLeave : MarkupValue -> Attribute
 onMouseLeave =
-    Markup.defineEvent "mouseleave"
+    Markup.defineEvent "onMouseLeave"
 
 
 onMouseOver : MarkupValue -> Attribute
 onMouseOver =
-    Markup.defineEvent "mouseover"
+    Markup.defineEvent "onMouseOver"
 
 
 onMouseOut : MarkupValue -> Attribute
 onMouseOut =
-    Markup.defineEvent "mouseout"
+    Markup.defineEvent "onMouseOut"
 
 
 onInput : MarkupValue -> Attribute
 onInput =
-    custom "input" { preventDefault = False, stopPropagation = True }
+    custom "onInput" { preventDefault = False, stopPropagation = True }
 
 
 onCheck : MarkupValue -> Attribute
 onCheck =
-    Markup.defineEvent "change"
+    Markup.defineEvent "onChange"
 
 
 onSubmit : MarkupValue -> Attribute
 onSubmit =
-    custom "submit" { preventDefault = True, stopPropagation = False }
+    custom "onSubmit" { preventDefault = True, stopPropagation = False }
 
 
 onBlur : MarkupValue -> Attribute
 onBlur =
-    Markup.defineEvent "blur"
+    Markup.defineEvent "onBlur"
 
 
 onFocus : MarkupValue -> Attribute
 onFocus =
-    Markup.defineEvent "focus"
+    Markup.defineEvent "onFocus"
 
 
 on : String -> MarkupValue -> Attribute
